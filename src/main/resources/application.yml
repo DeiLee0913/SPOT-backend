@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: spot-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/spot?characterEncoding=UTF-8}
+    username: ${DB_USERNAME:spot}
+    password: ${DB_PASSWORD:spot}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+
+spot:
+  default-goal-minutes: ${DEFAULT_GOAL_MINUTES:60}
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-to-a-long-random-string-at-least-32-bytes}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:43200}
+  oauth:
+    naver:
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:3000/auth/naver/callback}

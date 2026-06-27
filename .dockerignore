@@ -1,0 +1,15 @@
+.git
+.gitignore
+.gradle
+build
+out
+bin
+.idea
+*.iml
+.vscode
+.env
+.env.*
+!.env.example
+HELP.md
+*.md
+terminals

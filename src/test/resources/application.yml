@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:spot-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  flyway:
+    enabled: false
+
+spot:
+  default-goal-minutes: 60
+  jwt:
+    secret: test-secret-please-change-this-to-a-long-random-string-32-bytes-min
+    expiration-minutes: 60
+  oauth:
+    naver:
+      client-id: test-client-id
+      client-secret: test-client-secret
+      redirect-uri: http://localhost:3000/auth/naver/callback

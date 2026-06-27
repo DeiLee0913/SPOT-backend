@@ -1,0 +1,220 @@
+package com.spot.domain.dashboard;
+
+import com.spot.api.dto.DashboardDtos.DashboardResponse;
+import com.spot.api.dto.DashboardDtos.DashboardSession;
+import com.spot.api.dto.DashboardDtos.HistoryDay;
+import com.spot.api.dto.DashboardDtos.MemberDashboard;
+import com.spot.api.dto.DashboardDtos.ScoreBreakdown;
+import com.spot.api.dto.DashboardDtos.ScoreRange;
+import com.spot.common.NotFoundException;
+import com.spot.common.StudyDayService;
+import com.spot.domain.goal.DailyGoal;
+import com.spot.domain.goal.DailyGoalRepository;
+import com.spot.domain.group.GroupMember;
+import com.spot.domain.group.GroupMemberRepository;
+import com.spot.domain.group.MemberStatus;
+import com.spot.domain.session.SessionStatus;
+import com.spot.domain.session.StudySession;
+import com.spot.domain.session.StudySessionRepository;
+import com.spot.domain.user.User;
+import com.spot.domain.user.UserRepository;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class DashboardService {
+
+    private static final int HISTORY_DAYS = 7;
+
+    private final GroupMemberRepository memberRepository;
+    private final UserRepository userRepository;
+    private final DailyGoalRepository dailyGoalRepository;
+    private final StudySessionRepository sessionRepository;
+    private final StudyDayService studyDayService;
+
+    public DashboardService(
+        GroupMemberRepository memberRepository,
+        UserRepository userRepository,
+        DailyGoalRepository dailyGoalRepository,
+        StudySessionRepository sessionRepository,
+        StudyDayService studyDayService
+    ) {
+        this.memberRepository = memberRepository;
+        this.userRepository = userRepository;
+        this.dailyGoalRepository = dailyGoalRepository;
+        this.sessionRepository = sessionRepository;
+        this.studyDayService = studyDayService;
+    }
+
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboard(Long userId) {
+        GroupMember myMembership = memberRepository.findByUserIdAndStatus(userId, MemberStatus.ACTIVE)
+            .orElseThrow(() -> new NotFoundException("NO_GROUP", "소속된 그룹이 없습니다."));
+
+        LocalDate today = studyDayService.currentStudyDay();
+        LocalDate historyStart = today.minusDays(HISTORY_DAYS - 1L);
+        LocalDate weekStart = studyDayService.weekMonday(today);
+        boolean afterDeadlineToday = studyDayService.isAfterGoalDeadline(today);
+
+        List<GroupMember> activeMembers = memberRepository.findByGroupIdAndStatus(
+            myMembership.getGroupId(), MemberStatus.ACTIVE);
+
+        List<MemberAccumulator> accumulators = new ArrayList<>();
+        for (GroupMember member : activeMembers) {
+            User user = userRepository.findById(member.getUserId()).orElse(null);
+            if (user == null) {
+                continue;
+            }
+            accumulators.add(buildAccumulator(user, today, historyStart, weekStart, afterDeadlineToday));
+        }
+
+        assignRanks(accumulators);
+
+        List<MemberDashboard> members = accumulators.stream()
+            .map(acc -> acc.toDashboard(weekStart, today))
+            .toList();
+        return new DashboardResponse(today, members);
+    }
+
+    private MemberAccumulator buildAccumulator(
+        User user,
+        LocalDate today,
+        LocalDate historyStart,
+        LocalDate weekStart,
+        boolean afterDeadlineToday
+    ) {
+        int defaultGoal = user.getDefaultGoalMinutes();
+
+        Map<LocalDate, Integer> minutesByDay = new HashMap<>();
+        for (StudySession session : sessionRepository.findByUserIdAndStatusAndStudyDayBetween(
+            user.getId(), SessionStatus.CLOSED, historyStart, today)) {
+            minutesByDay.merge(
+                session.getStudyDay(),
+                session.getDurationMinutes() == null ? 0 : session.getDurationMinutes(),
+                Integer::sum
+            );
+        }
+
+        Map<LocalDate, Integer> goalByDay = new HashMap<>();
+        for (DailyGoal goal : dailyGoalRepository.findByUserIdAndStudyDayBetween(
+            user.getId(), historyStart, today)) {
+            goalByDay.put(goal.getStudyDay(), goal.getGoalMinutes());
+        }
+
+        int todayMinutes = minutesByDay.getOrDefault(today, 0);
+        Integer todayGoal = effectiveGoal(today, goalByDay, today, afterDeadlineToday, defaultGoal);
+
+        List<HistoryDay> history = new ArrayList<>();
+        for (int i = 0; i < HISTORY_DAYS; i++) {
+            LocalDate day = historyStart.plusDays(i);
+            history.add(new HistoryDay(
+                day,
+                minutesByDay.getOrDefault(day, 0),
+                effectiveGoal(day, goalByDay, today, afterDeadlineToday, defaultGoal)
+            ));
+        }
+
+        double achievementPoints = 0.0;
+        double volumeBonus = 0.0;
+        for (LocalDate day = weekStart; !day.isAfter(today); day = day.plusDays(1)) {
+            int actual = minutesByDay.getOrDefault(day, 0);
+            Integer goal = effectiveGoal(day, goalByDay, today, afterDeadlineToday, defaultGoal);
+            if (goal != null && goal > 0) {
+                achievementPoints += actual * 100.0 / goal;
+            }
+            volumeBonus += actual / 10.0;
+        }
+
+        List<DashboardSession> sessions = sessionRepository
+            .findByUserIdAndStatusAndStudyDay(user.getId(), SessionStatus.CLOSED, today).stream()
+            .map(s -> new DashboardSession(
+                s.getId(), s.getCategory(), s.getStartedAt(), s.getEndedAt(), s.getDurationMinutes()))
+            .toList();
+
+        double rawRate = (todayGoal != null && todayGoal > 0) ? todayMinutes * 100.0 / todayGoal : 0.0;
+
+        MemberAccumulator acc = new MemberAccumulator();
+        acc.userId = user.getId();
+        acc.nickname = user.getNickname();
+        acc.todayMinutes = todayMinutes;
+        acc.todayGoal = todayGoal;
+        acc.rawAchievementRate = round1(rawRate);
+        acc.displayAchievementRate = round1(Math.min(100.0, rawRate));
+        acc.achievementPoints = Math.round(achievementPoints);
+        acc.volumeBonus = Math.round(volumeBonus);
+        acc.weeklyScore = acc.achievementPoints + acc.volumeBonus;
+        acc.history = history;
+        acc.sessions = sessions;
+        return acc;
+    }
+
+    private Integer effectiveGoal(
+        LocalDate day,
+        Map<LocalDate, Integer> goalByDay,
+        LocalDate today,
+        boolean afterDeadlineToday,
+        int defaultGoal
+    ) {
+        Integer explicit = goalByDay.get(day);
+        if (explicit != null) {
+            return explicit;
+        }
+        if (day.isBefore(today)) {
+            return defaultGoal;
+        }
+        if (day.isEqual(today) && afterDeadlineToday) {
+            return defaultGoal;
+        }
+        return null;
+    }
+
+    private void assignRanks(List<MemberAccumulator> accumulators) {
+        for (MemberAccumulator member : accumulators) {
+            long higher = accumulators.stream()
+                .filter(other -> other.weeklyScore > member.weeklyScore)
+                .count();
+            member.weeklyRank = (int) (higher + 1);
+        }
+    }
+
+    private double round1(double value) {
+        return Math.round(value * 10.0) / 10.0;
+    }
+
+    private static final class MemberAccumulator {
+        private Long userId;
+        private String nickname;
+        private int todayMinutes;
+        private Integer todayGoal;
+        private double rawAchievementRate;
+        private double displayAchievementRate;
+        private long achievementPoints;
+        private long volumeBonus;
+        private long weeklyScore;
+        private int weeklyRank;
+        private List<HistoryDay> history;
+        private List<DashboardSession> sessions;
+
+        private MemberDashboard toDashboard(LocalDate weekStart, LocalDate today) {
+            return new MemberDashboard(
+                userId,
+                nickname,
+                todayMinutes,
+                todayGoal,
+                rawAchievementRate,
+                displayAchievementRate,
+                weeklyScore,
+                weeklyRank,
+                new ScoreBreakdown(achievementPoints, volumeBonus),
+                new ScoreRange(weekStart, today),
+                history,
+                sessions
+            );
+        }
+    }
+}

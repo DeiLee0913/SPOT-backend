@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: spot-backend
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # --- DB (Aiven MySQL 콘솔에서 복사한 값 입력) ---
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+      # --- JWT ---
+      # Render가 안전한 랜덤 값을 자동 생성 (직접 신경 쓸 필요 없음)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION_MINUTES
+        value: "43200"
+
+      # --- Naver OAuth (네이버 개발자센터 값 입력) ---
+      - key: NAVER_CLIENT_ID
+        sync: false
+      - key: NAVER_CLIENT_SECRET
+        sync: false
+      - key: NAVER_REDIRECT_URI
+        sync: false
+
+      # --- 앱 기본 설정 ---
+      - key: DEFAULT_GOAL_MINUTES
+        value: "60"
