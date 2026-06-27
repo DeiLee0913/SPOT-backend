@@ -175,6 +175,12 @@ class CoreApiTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code", is("FUTURE_TIME")));
 
+        // 미래 시작 시각 → 400
+        mockMvc.perform(asUser(post("/sessions/manual"), user)
+                .content("{\"category\":\"미래시작\",\"startedAt\":\"2026-06-27T01:00:00Z\",\"endedAt\":\"2026-06-27T01:30:00Z\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code", is("FUTURE_TIME")));
+
         // 오늘 세션 목록 (타이머 + 수동)
         mockMvc.perform(asUser(get("/sessions/today"), user))
             .andExpect(status().isOk())

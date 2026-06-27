@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DashboardService {
 
     private static final int HISTORY_DAYS = 7;
+    private static final int GOAL_ACHIEVED_POINTS_PER_DAY = 3;
+    private static final int STUDY_POINTS_PER_HOUR = 1;
 
     private final GroupMemberRepository memberRepository;
     private final UserRepository userRepository;
@@ -119,15 +121,15 @@ public class DashboardService {
             ));
         }
 
-        double achievementPoints = 0.0;
-        double volumeBonus = 0.0;
+        long achievementPoints = 0;
+        long volumeBonus = 0;
         for (LocalDate day = weekStart; !day.isAfter(today); day = day.plusDays(1)) {
             int actual = minutesByDay.getOrDefault(day, 0);
             Integer goal = effectiveGoal(day, goalByDay, today, afterDeadlineToday, defaultGoal);
-            if (goal != null && goal > 0) {
-                achievementPoints += actual * 100.0 / goal;
+            if (goal != null && actual >= goal) {
+                achievementPoints += GOAL_ACHIEVED_POINTS_PER_DAY;
             }
-            volumeBonus += actual / 10.0;
+            volumeBonus += actual / 60 * STUDY_POINTS_PER_HOUR;
         }
 
         List<DashboardSession> sessions = sessionRepository
@@ -145,9 +147,9 @@ public class DashboardService {
         acc.todayGoal = todayGoal;
         acc.rawAchievementRate = round1(rawRate);
         acc.displayAchievementRate = round1(Math.min(100.0, rawRate));
-        acc.achievementPoints = Math.round(achievementPoints);
-        acc.volumeBonus = Math.round(volumeBonus);
-        acc.weeklyScore = acc.achievementPoints + acc.volumeBonus;
+        acc.achievementPoints = achievementPoints;
+        acc.volumeBonus = volumeBonus;
+        acc.weeklyScore = achievementPoints + volumeBonus;
         acc.history = history;
         acc.sessions = sessions;
         return acc;

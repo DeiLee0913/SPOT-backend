@@ -130,7 +130,11 @@ public class SessionService {
         if (!endedAt.isAfter(startedAt)) {
             throw new BadRequestException("INVALID_TIME_RANGE", "종료 시각은 시작 시각 이후여야 합니다.");
         }
-        if (endedAt.isAfter(studyDayService.now())) {
+        Instant now = studyDayService.now();
+        if (startedAt.isAfter(now)) {
+            throw new BadRequestException("FUTURE_TIME", "시작 시각은 현재 이전이어야 합니다.");
+        }
+        if (endedAt.isAfter(now)) {
             throw new BadRequestException("FUTURE_TIME", "종료 시각은 현재 이전이어야 합니다.");
         }
         long minutes = Duration.between(startedAt, endedAt).toMinutes();
@@ -138,7 +142,7 @@ public class SessionService {
             throw new BadRequestException("SESSION_TOO_SHORT", "세션은 최소 1분 이상이어야 합니다.");
         }
         if (minutes > MAX_DURATION_MINUTES) {
-            throw new BadRequestException("SESSION_TOO_LONG", "세션은 최대 24시간까지 등록할 수 있습니다.");
+            throw new BadRequestException("SESSION_TOO_LONG", "세션은 최대 2시간까지 등록할 수 있습니다.");
         }
     }
 
