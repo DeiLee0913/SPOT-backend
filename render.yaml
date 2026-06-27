@@ -28,7 +28,7 @@ services:
       - key: NAVER_CLIENT_SECRET
         sync: false
       - key: NAVER_REDIRECT_URI
-        sync: false
+        value: "https://spot-front-omega.vercel.app/auth/naver/callback"
 
       # --- 앱 기본 설정 ---
       - key: DEFAULT_GOAL_MINUTES

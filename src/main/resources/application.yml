@@ -31,4 +31,4 @@ spot:
     naver:
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
-      redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:3000/auth/naver/callback}
+      redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:5173/auth/naver/callback}

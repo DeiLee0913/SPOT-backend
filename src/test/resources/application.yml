@@ -22,4 +22,4 @@ spot:
     naver:
       client-id: test-client-id
       client-secret: test-client-secret
-      redirect-uri: http://localhost:3000/auth/naver/callback
+      redirect-uri: http://localhost:5173/auth/naver/callback

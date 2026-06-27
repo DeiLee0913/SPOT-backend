@@ -66,6 +66,7 @@ public class NaverOAuthClientImpl implements NaverOAuthClient {
             .queryParam("grant_type", "authorization_code")
             .queryParam("client_id", clientId)
             .queryParam("client_secret", clientSecret)
+            .queryParam("redirect_uri", redirectUri)
             .queryParam("code", code)
             .queryParam("state", state)
             .build()
@@ -77,7 +78,10 @@ public class NaverOAuthClientImpl implements NaverOAuthClient {
             .body(TokenResponse.class);
 
         if (token == null || !StringUtils.hasText(token.accessToken())) {
-            throw new UnauthorizedException("네이버 인증에 실패했습니다.");
+            String detail = token != null && StringUtils.hasText(token.error())
+                ? token.error()
+                : "unknown";
+            throw new UnauthorizedException("네이버 인증에 실패했습니다: " + detail);
         }
         return token.accessToken();
     }

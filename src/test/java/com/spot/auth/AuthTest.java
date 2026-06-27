@@ -50,6 +50,17 @@ class AuthTest {
     }
 
     @Test
+    void naverAuthorizeUrlReturnsUrlAndState() throws Exception {
+        when(naverOAuthClient.buildAuthorizeUrl(any()))
+            .thenAnswer(inv -> "https://nid.naver.com/oauth2.0/authorize?state=" + inv.getArgument(0));
+
+        mockMvc.perform(get("/auth/naver/authorize-url"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.authorizeUrl").exists())
+            .andExpect(jsonPath("$.data.state").exists());
+    }
+
+    @Test
     void naverLoginIssuesJwtAndAuthenticatesMe() throws Exception {
         when(naverOAuthClient.fetchProfile(any(), any()))
             .thenReturn(new NaverProfile("naver-abc", "minji@example.com", "민지"));
