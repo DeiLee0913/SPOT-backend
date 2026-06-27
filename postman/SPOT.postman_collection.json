@@ -1,0 +1,329 @@
+{
+  "info": {
+    "name": "SPOT Backend",
+    "description": "SPOT 백엔드 API 컬렉션.\n\n사용법:\n1. 컬렉션 변수 baseUrl 확인 (로컬: http://localhost:8080, 배포: https://spot-study-pot-api.onrender.com)\n2. 'Auth > dev token' 먼저 실행 → 응답의 token이 컬렉션 변수 {{token}} 에 자동 저장됨 (이후 모든 요청에 Bearer 자동 적용)\n3. 다른 사용자로 테스트하려면 컬렉션 변수 userKey 를 바꾸고 dev token 다시 실행\n4. Group > create 실행 시 inviteCode/groupId 자동 저장, Join Requests > list 실행 시 memberId 자동 저장, Sessions > start 실행 시 sessionId 자동 저장\n\n주의: dev token API는 백엔드가 dev 프로파일일 때만 동작 (SPRING_PROFILES_ACTIVE=dev).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "userKey", "value": "minji" },
+    { "key": "nickname", "value": "Minji" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "groupId", "value": "" },
+    { "key": "inviteCode", "value": "" },
+    { "key": "memberId", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "startedAt", "value": "" },
+    { "key": "endedAt", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "dev token (dev 프로파일 전용)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res && res.data && res.data.token) {",
+                  "  pm.collectionVariables.set('token', res.data.token);",
+                  "  pm.collectionVariables.set('userId', res.data.userId);",
+                  "  console.log('token saved for userId=' + res.data.userId);",
+                  "}",
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"{{userKey}}\",\n  \"nickname\": \"{{nickname}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/dev/token", "host": ["{{baseUrl}}"], "path": ["auth", "dev", "token"] }
+          }
+        },
+        {
+          "name": "naver authorize url",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/naver/authorize-url", "host": ["{{baseUrl}}"], "path": ["auth", "naver", "authorize-url"] }
+          }
+        },
+        {
+          "name": "naver login (code 교환)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"네이버에서_받은_code\",\n  \"state\": \"authorize-url_응답의_state\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/naver", "host": ["{{baseUrl}}"], "path": ["auth", "naver"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "item": [
+        {
+          "name": "get me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/me", "host": ["{{baseUrl}}"], "path": ["me"] }
+          }
+        },
+        {
+          "name": "update default goal (>=60)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"goalMinutes\": 120\n}" },
+            "url": { "raw": "{{baseUrl}}/me/default-goal", "host": ["{{baseUrl}}"], "path": ["me", "default-goal"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Group",
+      "item": [
+        {
+          "name": "create group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res && res.data) {",
+                  "  pm.collectionVariables.set('groupId', res.data.groupId);",
+                  "  pm.collectionVariables.set('inviteCode', res.data.inviteCode);",
+                  "  console.log('inviteCode=' + res.data.inviteCode);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Smoke Study\"\n}" },
+            "url": { "raw": "{{baseUrl}}/groups", "host": ["{{baseUrl}}"], "path": ["groups"] }
+          }
+        },
+        {
+          "name": "my group",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/groups/me", "host": ["{{baseUrl}}"], "path": ["groups", "me"] }
+          }
+        },
+        {
+          "name": "join group (inviteCode)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"inviteCode\": \"{{inviteCode}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/groups/join", "host": ["{{baseUrl}}"], "path": ["groups", "join"] }
+          }
+        },
+        {
+          "name": "leave group (생성자는 successorUserId 지정)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"successorUserId\": null\n}" },
+            "url": { "raw": "{{baseUrl}}/groups/me/leave", "host": ["{{baseUrl}}"], "path": ["groups", "me", "leave"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Join Requests (생성자)",
+      "item": [
+        {
+          "name": "list pending",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res && res.data && res.data.length > 0) {",
+                  "  pm.collectionVariables.set('memberId', res.data[0].memberId);",
+                  "  console.log('memberId=' + res.data[0].memberId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/groups/me/join-requests", "host": ["{{baseUrl}}"], "path": ["groups", "me", "join-requests"] }
+          }
+        },
+        {
+          "name": "approve",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/groups/me/join-requests/{{memberId}}/approve", "host": ["{{baseUrl}}"], "path": ["groups", "me", "join-requests", "{{memberId}}", "approve"] }
+          }
+        },
+        {
+          "name": "reject",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/groups/me/join-requests/{{memberId}}/reject", "host": ["{{baseUrl}}"], "path": ["groups", "me", "join-requests", "{{memberId}}", "reject"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Goals",
+      "item": [
+        {
+          "name": "get today goal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/goals/today", "host": ["{{baseUrl}}"], "path": ["goals", "today"] }
+          }
+        },
+        {
+          "name": "set today goal (10:00 KST 이전만, 0분 허용)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"goalMinutes\": 120\n}" },
+            "url": { "raw": "{{baseUrl}}/goals/today", "host": ["{{baseUrl}}"], "path": ["goals", "today"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sessions",
+      "item": [
+        {
+          "name": "start timer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res && res.data) {",
+                  "  pm.collectionVariables.set('sessionId', res.data.sessionId);",
+                  "  console.log('sessionId=' + res.data.sessionId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"category\": \"Spring\"\n}" },
+            "url": { "raw": "{{baseUrl}}/sessions/start", "host": ["{{baseUrl}}"], "path": ["sessions", "start"] }
+          }
+        },
+        {
+          "name": "end timer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/end", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "end"] }
+          }
+        },
+        {
+          "name": "manual session (자동 시각 계산)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var now = Date.now();",
+                  "pm.collectionVariables.set('startedAt', new Date(now - 120*60000).toISOString());",
+                  "pm.collectionVariables.set('endedAt', new Date(now - 30*60000).toISOString());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"category\": \"Spring\",\n  \"startedAt\": \"{{startedAt}}\",\n  \"endedAt\": \"{{endedAt}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/sessions/manual", "host": ["{{baseUrl}}"], "path": ["sessions", "manual"] }
+          }
+        },
+        {
+          "name": "today sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sessions/today", "host": ["{{baseUrl}}"], "path": ["sessions", "today"] }
+          }
+        },
+        {
+          "name": "open session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sessions/open", "host": ["{{baseUrl}}"], "path": ["sessions", "open"] }
+          }
+        },
+        {
+          "name": "delete session (수정 불가, 삭제만 가능)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "group dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/groups/me/dashboard", "host": ["{{baseUrl}}"], "path": ["groups", "me", "dashboard"] }
+          }
+        }
+      ]
+    }
+  ]
+}

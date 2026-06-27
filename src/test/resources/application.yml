@@ -13,6 +13,8 @@ spring:
 
 spot:
   default-goal-minutes: 60
+  cors:
+    allowed-origins: http://localhost:5173
   jwt:
     secret: test-secret-please-change-this-to-a-long-random-string-32-bytes-min
     expiration-minutes: 60
