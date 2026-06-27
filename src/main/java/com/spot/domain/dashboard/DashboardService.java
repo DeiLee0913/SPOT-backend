@@ -74,7 +74,8 @@ public class DashboardService {
             if (user == null) {
                 continue;
             }
-            accumulators.add(buildAccumulator(user, today, historyStart, weekStart, afterDeadlineToday));
+            accumulators.add(buildAccumulator(
+                member, user, today, historyStart, weekStart, afterDeadlineToday));
         }
 
         assignRanks(accumulators);
@@ -86,12 +87,16 @@ public class DashboardService {
     }
 
     private MemberAccumulator buildAccumulator(
+        GroupMember membership,
         User user,
         LocalDate today,
         LocalDate historyStart,
         LocalDate weekStart,
         boolean afterDeadlineToday
     ) {
+        LocalDate joinedStudyDay = membership.getJoinedAt() != null
+            ? studyDayService.toStudyDay(membership.getJoinedAt())
+            : today;
         int defaultGoal = user.getDefaultGoalMinutes();
 
         Map<LocalDate, Integer> minutesByDay = new HashMap<>();
@@ -116,6 +121,10 @@ public class DashboardService {
         List<HistoryDay> history = new ArrayList<>();
         for (int i = 0; i < HISTORY_DAYS; i++) {
             LocalDate day = historyStart.plusDays(i);
+            if (day.isBefore(joinedStudyDay)) {
+                history.add(new HistoryDay(day, 0, null));
+                continue;
+            }
             history.add(new HistoryDay(
                 day,
                 minutesByDay.getOrDefault(day, 0),
@@ -126,6 +135,9 @@ public class DashboardService {
         long achievementPoints = 0;
         long volumeBonus = 0;
         for (LocalDate day = weekStart; !day.isAfter(today); day = day.plusDays(1)) {
+            if (day.isBefore(joinedStudyDay)) {
+                continue;
+            }
             int actual = minutesByDay.getOrDefault(day, 0);
             Integer goal = effectiveGoal(day, goalByDay, today, afterDeadlineToday, defaultGoal);
             if (goal != null && actual >= goal) {
