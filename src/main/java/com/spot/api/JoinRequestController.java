@@ -7,6 +7,7 @@ import com.spot.common.ApiResponse;
 import com.spot.domain.group.GroupMember;
 import com.spot.domain.group.GroupService;
 import com.spot.domain.group.GroupService.PendingJoinRequest;
+import com.spot.domain.user.UserRepository;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class JoinRequestController {
 
     private final GroupService groupService;
+    private final UserRepository userRepository;
 
-    public JoinRequestController(GroupService groupService) {
+    public JoinRequestController(GroupService groupService, UserRepository userRepository) {
         this.groupService = groupService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping
@@ -62,6 +65,15 @@ public class JoinRequestController {
     }
 
     private JoinRequestResponse toResponse(Long groupId, GroupMember member) {
-        return new JoinRequestResponse(member.getId(), groupId, member.getUserId(), member.getStatus());
+        String nickname = userRepository.findById(member.getUserId())
+            .map(user -> user.resolvedDisplayName())
+            .orElse("사용자");
+        return new JoinRequestResponse(
+            member.getId(),
+            groupId,
+            member.getUserId(),
+            nickname,
+            member.getStatus()
+        );
     }
 }

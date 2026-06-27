@@ -55,6 +55,12 @@ public final class GroupDtos {
         }
     }
 
-    public record JoinRequestResponse(Long memberId, Long groupId, Long userId, MemberStatus status) {
+    public record JoinRequestResponse(
+        Long memberId,
+        Long groupId,
+        Long userId,
+        String nickname,
+        MemberStatus status
+    ) {
     }
 }

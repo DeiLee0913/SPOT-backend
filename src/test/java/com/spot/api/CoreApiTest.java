@@ -89,6 +89,7 @@ class CoreApiTest {
         MvcResult requests = mockMvc.perform(asUser(get("/groups/me/join-requests"), creator))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].status", is("PENDING")))
+            .andExpect(jsonPath("$.data[0].nickname").exists())
             .andReturn();
         long memberId = dataNode(requests).get(0).get("memberId").asLong();
 
