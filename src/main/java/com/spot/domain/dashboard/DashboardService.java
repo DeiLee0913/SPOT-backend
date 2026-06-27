@@ -94,9 +94,7 @@ public class DashboardService {
         LocalDate weekStart,
         boolean afterDeadlineToday
     ) {
-        LocalDate joinedStudyDay = membership.getJoinedAt() != null
-            ? studyDayService.toStudyDay(membership.getJoinedAt())
-            : today;
+        LocalDate joinedStudyDay = resolveJoinedStudyDay(membership, today);
         int defaultGoal = user.getDefaultGoalMinutes();
 
         Map<LocalDate, Integer> minutesByDay = new HashMap<>();
@@ -167,6 +165,16 @@ public class DashboardService {
         acc.history = history;
         acc.sessions = sessions;
         return acc;
+    }
+
+    private LocalDate resolveJoinedStudyDay(GroupMember membership, LocalDate today) {
+        if (membership.getJoinedAt() != null) {
+            return studyDayService.toStudyDay(membership.getJoinedAt());
+        }
+        if (membership.getCreatedAt() != null) {
+            return studyDayService.toStudyDay(membership.getCreatedAt());
+        }
+        return today;
     }
 
     private Integer effectiveGoal(

@@ -6,6 +6,7 @@ import com.spot.common.ApiResponse;
 import com.spot.common.BadRequestException;
 import com.spot.domain.group.GroupService;
 import com.spot.domain.group.GroupService.MyGroup;
+import com.spot.domain.group.MemberStatus;
 import com.spot.domain.session.SessionService;
 import com.spot.domain.session.StudySession;
 import com.spot.domain.user.User;
@@ -67,6 +68,12 @@ public class MeController {
             .map(MeController::toGroupSummary)
             .toList();
 
+        GroupSummary group = groups.stream()
+            .filter(g -> MemberStatus.ACTIVE.name().equals(g.memberStatus()))
+            .findFirst()
+            .or(() -> groups.stream().findFirst())
+            .orElse(null);
+
         OpenSession openSession = sessionService.findOpen(userId)
             .map(MeController::toOpenSession)
             .orElse(null);
@@ -79,6 +86,7 @@ public class MeController {
             user.needsDisplayNameSetup(),
             user.getDefaultGoalMinutes(),
             groups,
+            group,
             openSession
         );
     }
@@ -116,6 +124,7 @@ public class MeController {
         boolean needsDisplayNameSetup,
         int defaultGoalMinutes,
         List<GroupSummary> groups,
+        GroupSummary group,
         OpenSession openSession
     ) {
     }

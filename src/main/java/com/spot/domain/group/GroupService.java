@@ -181,6 +181,18 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
+    public Long resolveDashboardGroupId(Long userId, Long groupId) {
+        if (groupId != null) {
+            return groupId;
+        }
+        return listMyGroups(userId).stream()
+            .filter(g -> g.memberStatus() == MemberStatus.ACTIVE)
+            .map(g -> g.group().getId())
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("NO_GROUP", "활성 그룹 멤버십이 없습니다."));
+    }
+
+    @Transactional(readOnly = true)
     public GroupMember requireActiveMembership(Long userId, Long groupId) {
         GroupMember membership = memberRepository.findByGroupIdAndUserId(groupId, userId)
             .filter(m -> m.getStatus() == MemberStatus.ACTIVE)

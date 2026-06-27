@@ -102,6 +102,11 @@ class CoreApiTest {
         mockMvc.perform(asUser(get("/groups/me/dashboard?groupId=" + groupId), creator))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.members.length()", is(2)));
+
+        // 구버전 프론트: groupId 생략 시 첫 ACTIVE 그룹
+        mockMvc.perform(asUser(get("/groups/me/dashboard"), creator))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.members.length()", is(2)));
     }
 
     @Test
