@@ -2,6 +2,7 @@ package com.spot.api;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -178,6 +179,10 @@ class CoreApiTest {
         mockMvc.perform(asUser(get("/sessions/today"), user))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(2)));
+
+        // 타이머 세션도 삭제 가능 (수정은 불가)
+        mockMvc.perform(asUser(delete("/sessions/" + sessionId), user))
+            .andExpect(status().isOk());
     }
 
     private String newUserToken(String nickname) {

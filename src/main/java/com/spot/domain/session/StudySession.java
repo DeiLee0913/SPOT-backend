@@ -115,18 +115,6 @@ public class StudySession {
         this.status = SessionStatus.CLOSED;
     }
 
-    public void updateManual(LocalDate studyDay, String category, Instant startedAt, Instant endedAt) {
-        this.studyDay = studyDay;
-        this.category = category;
-        this.startedAt = startedAt;
-        this.endedAt = endedAt;
-        this.durationMinutes = toMinutes(startedAt, endedAt);
-    }
-
-    public boolean isManual() {
-        return this.source == SessionSource.MANUAL;
-    }
-
     private static int toMinutes(Instant startedAt, Instant endedAt) {
         return (int) Duration.between(startedAt, endedAt).toMinutes();
     }

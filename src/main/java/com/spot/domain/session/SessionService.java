@@ -56,32 +56,18 @@ public class SessionService {
     public StudySession registerManual(Long userId, String rawCategory, Instant startedAt, Instant endedAt) {
         String category = validateCategory(rawCategory);
         validateRange(startedAt, endedAt);
-        ensureNoOverlap(userId, startedAt, endedAt, null);
+        ensureNoOverlap(userId, startedAt, endedAt);
 
         LocalDate studyDay = studyDayService.toStudyDay(startedAt);
         return sessionRepository.save(StudySession.manual(userId, studyDay, category, startedAt, endedAt));
     }
 
+    /**
+     * 세션 삭제. 등록 후 수정은 불가하고, 타이머/수동 구분 없이 본인 세션이면 삭제만 허용한다.
+     */
     @Transactional
-    public StudySession updateManual(Long userId, Long sessionId, String rawCategory, Instant startedAt, Instant endedAt) {
+    public void deleteSession(Long userId, Long sessionId) {
         StudySession session = getOwnedSession(userId, sessionId);
-        if (!session.isManual()) {
-            throw new ForbiddenException("NOT_MANUAL_SESSION", "타이머 세션은 수정할 수 없습니다.");
-        }
-        String category = validateCategory(rawCategory);
-        validateRange(startedAt, endedAt);
-        ensureNoOverlap(userId, startedAt, endedAt, sessionId);
-
-        session.updateManual(studyDayService.toStudyDay(startedAt), category, startedAt, endedAt);
-        return session;
-    }
-
-    @Transactional
-    public void deleteManual(Long userId, Long sessionId) {
-        StudySession session = getOwnedSession(userId, sessionId);
-        if (!session.isManual()) {
-            throw new ForbiddenException("NOT_MANUAL_SESSION", "타이머 세션은 삭제할 수 없습니다.");
-        }
         sessionRepository.delete(session);
     }
 
@@ -156,10 +142,9 @@ public class SessionService {
         }
     }
 
-    private void ensureNoOverlap(Long userId, Instant startedAt, Instant endedAt, Long excludeSessionId) {
+    private void ensureNoOverlap(Long userId, Instant startedAt, Instant endedAt) {
         Instant now = studyDayService.now();
         boolean overlap = sessionRepository.findByUserId(userId).stream()
-            .filter(s -> excludeSessionId == null || !s.getId().equals(excludeSessionId))
             .anyMatch(s -> {
                 Instant sStart = s.getStartedAt();
                 Instant sEnd = s.getStatus() == SessionStatus.CLOSED ? s.getEndedAt() : now;

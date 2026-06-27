@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -66,28 +65,12 @@ public class SessionController {
         return ApiResponse.ok(SessionResponse.from(session));
     }
 
-    @PutMapping("/{sessionId}")
-    public ApiResponse<SessionResponse> updateManual(
-        @CurrentUser AuthenticatedUser currentUser,
-        @PathVariable Long sessionId,
-        @Valid @RequestBody ManualSessionRequest request
-    ) {
-        StudySession session = sessionService.updateManual(
-            currentUser.userId(),
-            sessionId,
-            request.category(),
-            request.startedAt(),
-            request.endedAt()
-        );
-        return ApiResponse.ok(SessionResponse.from(session));
-    }
-
     @DeleteMapping("/{sessionId}")
-    public ApiResponse<Void> deleteManual(
+    public ApiResponse<Void> delete(
         @CurrentUser AuthenticatedUser currentUser,
         @PathVariable Long sessionId
     ) {
-        sessionService.deleteManual(currentUser.userId(), sessionId);
+        sessionService.deleteSession(currentUser.userId(), sessionId);
         return ApiResponse.ok(null);
     }
 
