@@ -34,8 +34,8 @@ services:
       - key: DEFAULT_GOAL_MINUTES
         value: "60"
 
-      # --- 프론트 로컬 개발용 (테스트 끝나면 제거 권장) ---
+      # --- CORS (로컬 + Vercel 프론트) ---
       - key: CORS_ALLOWED_ORIGINS
-        value: "http://localhost:5173"
+        value: "http://localhost:5173,https://spot-front-omega.vercel.app"
       - key: SPRING_PROFILES_ACTIVE
         value: "dev"
