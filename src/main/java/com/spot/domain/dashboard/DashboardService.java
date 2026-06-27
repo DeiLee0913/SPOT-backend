@@ -6,12 +6,12 @@ import com.spot.api.dto.DashboardDtos.HistoryDay;
 import com.spot.api.dto.DashboardDtos.MemberDashboard;
 import com.spot.api.dto.DashboardDtos.ScoreBreakdown;
 import com.spot.api.dto.DashboardDtos.ScoreRange;
-import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
 import com.spot.domain.goal.DailyGoal;
 import com.spot.domain.goal.DailyGoalRepository;
 import com.spot.domain.group.GroupMember;
 import com.spot.domain.group.GroupMemberRepository;
+import com.spot.domain.group.GroupService;
 import com.spot.domain.group.MemberStatus;
 import com.spot.domain.session.SessionStatus;
 import com.spot.domain.session.StudySession;
@@ -34,6 +34,7 @@ public class DashboardService {
     private static final int STUDY_POINTS_PER_HOUR = 1;
 
     private final GroupMemberRepository memberRepository;
+    private final GroupService groupService;
     private final UserRepository userRepository;
     private final DailyGoalRepository dailyGoalRepository;
     private final StudySessionRepository sessionRepository;
@@ -41,12 +42,14 @@ public class DashboardService {
 
     public DashboardService(
         GroupMemberRepository memberRepository,
+        GroupService groupService,
         UserRepository userRepository,
         DailyGoalRepository dailyGoalRepository,
         StudySessionRepository sessionRepository,
         StudyDayService studyDayService
     ) {
         this.memberRepository = memberRepository;
+        this.groupService = groupService;
         this.userRepository = userRepository;
         this.dailyGoalRepository = dailyGoalRepository;
         this.sessionRepository = sessionRepository;
@@ -54,9 +57,8 @@ public class DashboardService {
     }
 
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboard(Long userId) {
-        GroupMember myMembership = memberRepository.findByUserIdAndStatus(userId, MemberStatus.ACTIVE)
-            .orElseThrow(() -> new NotFoundException("NO_GROUP", "소속된 그룹이 없습니다."));
+    public DashboardResponse getDashboard(Long userId, Long groupId) {
+        groupService.requireActiveMembership(userId, groupId);
 
         LocalDate today = studyDayService.currentStudyDay();
         LocalDate historyStart = today.minusDays(HISTORY_DAYS - 1L);
@@ -64,7 +66,7 @@ public class DashboardService {
         boolean afterDeadlineToday = studyDayService.isAfterGoalDeadline(today);
 
         List<GroupMember> activeMembers = memberRepository.findByGroupIdAndStatus(
-            myMembership.getGroupId(), MemberStatus.ACTIVE);
+            groupId, MemberStatus.ACTIVE);
 
         List<MemberAccumulator> accumulators = new ArrayList<>();
         for (GroupMember member : activeMembers) {

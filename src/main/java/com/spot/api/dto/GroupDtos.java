@@ -4,6 +4,7 @@ import com.spot.domain.group.GroupService.MyGroup;
 import com.spot.domain.group.MemberStatus;
 import com.spot.domain.group.StudyGroup;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public final class GroupDtos {
 
@@ -16,7 +17,10 @@ public final class GroupDtos {
     public record JoinGroupRequest(@NotBlank(message = "초대 코드를 입력해주세요.") String inviteCode) {
     }
 
-    public record LeaveGroupRequest(Long successorUserId) {
+    public record LeaveGroupRequest(
+        @NotNull(message = "그룹 ID를 입력해주세요.") Long groupId,
+        Long successorUserId
+    ) {
     }
 
     public record CreateGroupResponse(Long groupId, String name, String inviteCode, Long creatorUserId) {
@@ -51,6 +55,6 @@ public final class GroupDtos {
         }
     }
 
-    public record JoinRequestResponse(Long memberId, Long userId, MemberStatus status) {
+    public record JoinRequestResponse(Long memberId, Long groupId, Long userId, MemberStatus status) {
     }
 }

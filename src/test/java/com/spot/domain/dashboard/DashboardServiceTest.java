@@ -86,7 +86,7 @@ class DashboardServiceTest {
         // Wed: goal 0, actual 0 -> achieved(3) + 0h = 3
         dailyGoalRepository.save(new DailyGoal(user.getId(), LocalDate.of(2026, 6, 25), 0, GoalSource.USER_SET));
 
-        var member = dashboardService.getDashboard(user.getId()).members().getFirst();
+        var member = dashboardService.getDashboard(user.getId(), group.getId()).members().getFirst();
         assertThat(member.weeklyScoreBreakdown().achievementPoints()).isEqualTo(6); // Mon + Wed
         assertThat(member.weeklyScoreBreakdown().volumeBonus()).isEqualTo(2); // 120min only
         assertThat(member.weeklyScore()).isEqualTo(8);

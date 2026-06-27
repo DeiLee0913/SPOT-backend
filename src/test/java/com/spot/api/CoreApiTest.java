@@ -72,12 +72,12 @@ class CoreApiTest {
             .andExpect(jsonPath("$.data.inviteCode").exists())
             .andReturn();
         String inviteCode = dataNode(created).get("inviteCode").asText();
+        long groupId = dataNode(created).get("groupId").asLong();
 
-        // 같은 사용자가 또 생성 → 409
+        // 같은 사용자가 다른 그룹도 생성 가능
         mockMvc.perform(asUser(post("/groups"), creator)
-                .content("{\"name\":\"중복\"}"))
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.error.code", is("ALREADY_IN_GROUP")));
+                .content("{\"name\":\"두번째 스터디\"}"))
+            .andExpect(status().isCreated());
 
         // 멤버 가입 요청
         mockMvc.perform(asUser(post("/groups/join"), member)
@@ -98,9 +98,40 @@ class CoreApiTest {
             .andExpect(jsonPath("$.data.status", is("ACTIVE")));
 
         // 대시보드에 두 멤버 노출
-        mockMvc.perform(asUser(get("/groups/me/dashboard"), creator))
+        mockMvc.perform(asUser(get("/groups/me/dashboard?groupId=" + groupId), creator))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.members.length()", is(2)));
+    }
+
+    @Test
+    void memberCanBelongToMultipleGroups() throws Exception {
+        String creatorA = newUserToken("방장A");
+        String creatorB = newUserToken("방장B");
+        String member = newUserToken("멤버");
+
+        MvcResult groupA = mockMvc.perform(asUser(post("/groups"), creatorA)
+                .content("{\"name\":\"A팀\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        String codeA = dataNode(groupA).get("inviteCode").asText();
+
+        MvcResult groupB = mockMvc.perform(asUser(post("/groups"), creatorB)
+                .content("{\"name\":\"B팀\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        String codeB = dataNode(groupB).get("inviteCode").asText();
+
+        mockMvc.perform(asUser(post("/groups/join"), member)
+                .content("{\"inviteCode\":\"" + codeA + "\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(post("/groups/join"), member)
+                .content("{\"inviteCode\":\"" + codeB + "\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(get("/groups/me"), member))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(2)));
     }
 
     @Test

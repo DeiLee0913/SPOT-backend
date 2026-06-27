@@ -6,11 +6,13 @@ import com.spot.auth.CurrentUser;
 import com.spot.common.ApiResponse;
 import com.spot.domain.group.GroupMember;
 import com.spot.domain.group.GroupService;
+import com.spot.domain.group.GroupService.PendingJoinRequest;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -24,10 +26,20 @@ public class JoinRequestController {
     }
 
     @GetMapping
-    public ApiResponse<List<JoinRequestResponse>> list(@CurrentUser AuthenticatedUser currentUser) {
-        List<JoinRequestResponse> requests = groupService.listPendingRequests(currentUser.userId()).stream()
-            .map(this::toResponse)
-            .toList();
+    public ApiResponse<List<JoinRequestResponse>> list(
+        @CurrentUser AuthenticatedUser currentUser,
+        @RequestParam(required = false) Long groupId
+    ) {
+        List<JoinRequestResponse> requests;
+        if (groupId != null) {
+            requests = groupService.listPendingRequests(currentUser.userId(), groupId).stream()
+                .map(member -> toResponse(groupId, member))
+                .toList();
+        } else {
+            requests = groupService.listAllPendingRequestsForCreator(currentUser.userId()).stream()
+                .map(item -> toResponse(item.groupId(), item.member()))
+                .toList();
+        }
         return ApiResponse.ok(requests);
     }
 
@@ -37,7 +49,7 @@ public class JoinRequestController {
         @PathVariable Long memberId
     ) {
         GroupMember member = groupService.approve(currentUser.userId(), memberId);
-        return ApiResponse.ok(toResponse(member));
+        return ApiResponse.ok(toResponse(member.getGroupId(), member));
     }
 
     @PostMapping("/{memberId}/reject")
@@ -46,10 +58,10 @@ public class JoinRequestController {
         @PathVariable Long memberId
     ) {
         GroupMember member = groupService.reject(currentUser.userId(), memberId);
-        return ApiResponse.ok(toResponse(member));
+        return ApiResponse.ok(toResponse(member.getGroupId(), member));
     }
 
-    private JoinRequestResponse toResponse(GroupMember member) {
-        return new JoinRequestResponse(member.getId(), member.getUserId(), member.getStatus());
+    private JoinRequestResponse toResponse(Long groupId, GroupMember member) {
+        return new JoinRequestResponse(member.getId(), groupId, member.getUserId(), member.getStatus());
     }
 }

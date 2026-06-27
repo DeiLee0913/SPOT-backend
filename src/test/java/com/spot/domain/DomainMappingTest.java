@@ -62,7 +62,8 @@ class DomainMappingTest {
         assertThat(studyGroupRepository.findByInviteCode("ABC123")).isPresent();
         assertThat(group.getMaxMembers()).isEqualTo(StudyGroup.DEFAULT_MAX_MEMBERS);
         assertThat(groupMemberRepository.countByGroupIdAndStatus(group.getId(), MemberStatus.ACTIVE)).isEqualTo(1);
-        assertThat(groupMemberRepository.findByUserIdAndStatus(creator.getId(), MemberStatus.ACTIVE)).isPresent();
+        assertThat(groupMemberRepository.findByUserIdAndStatusIn(
+            creator.getId(), java.util.EnumSet.of(MemberStatus.ACTIVE))).isNotEmpty();
     }
 
     @Test

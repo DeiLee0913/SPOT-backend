@@ -9,8 +9,10 @@ import com.spot.auth.AuthenticatedUser;
 import com.spot.auth.CurrentUser;
 import com.spot.common.ApiResponse;
 import com.spot.domain.group.GroupService;
+import com.spot.domain.group.GroupService.MyGroup;
 import com.spot.domain.group.StudyGroup;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,22 +46,24 @@ public class GroupController {
         @CurrentUser AuthenticatedUser currentUser,
         @Valid @RequestBody JoinGroupRequest request
     ) {
-        groupService.join(currentUser.userId(), request.inviteCode());
-        return ApiResponse.ok(GroupSummaryResponse.from(groupService.getMyGroup(currentUser.userId())));
+        MyGroup joined = groupService.join(currentUser.userId(), request.inviteCode());
+        return ApiResponse.ok(GroupSummaryResponse.from(joined));
     }
 
     @GetMapping("/me")
-    public ApiResponse<GroupSummaryResponse> myGroup(@CurrentUser AuthenticatedUser currentUser) {
-        return ApiResponse.ok(GroupSummaryResponse.from(groupService.getMyGroup(currentUser.userId())));
+    public ApiResponse<List<GroupSummaryResponse>> myGroups(@CurrentUser AuthenticatedUser currentUser) {
+        List<GroupSummaryResponse> groups = groupService.listMyGroups(currentUser.userId()).stream()
+            .map(GroupSummaryResponse::from)
+            .toList();
+        return ApiResponse.ok(groups);
     }
 
     @PostMapping("/me/leave")
     public ApiResponse<Void> leave(
         @CurrentUser AuthenticatedUser currentUser,
-        @RequestBody(required = false) LeaveGroupRequest request
+        @Valid @RequestBody LeaveGroupRequest request
     ) {
-        Long successorUserId = request == null ? null : request.successorUserId();
-        groupService.leave(currentUser.userId(), successorUserId);
+        groupService.leave(currentUser.userId(), request.groupId(), request.successorUserId());
         return ApiResponse.ok(null);
     }
 }

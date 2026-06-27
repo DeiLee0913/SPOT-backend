@@ -7,6 +7,7 @@ import com.spot.common.ApiResponse;
 import com.spot.domain.dashboard.DashboardService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -20,7 +21,10 @@ public class DashboardController {
     }
 
     @GetMapping
-    public ApiResponse<DashboardResponse> dashboard(@CurrentUser AuthenticatedUser currentUser) {
-        return ApiResponse.ok(dashboardService.getDashboard(currentUser.userId()));
+    public ApiResponse<DashboardResponse> dashboard(
+        @CurrentUser AuthenticatedUser currentUser,
+        @RequestParam Long groupId
+    ) {
+        return ApiResponse.ok(dashboardService.getDashboard(currentUser.userId(), groupId));
     }
 }

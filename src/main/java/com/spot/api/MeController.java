@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,9 +63,9 @@ public class MeController {
     private MeResponse buildMeResponse(Long userId) {
         User user = userService.getById(userId);
 
-        GroupSummary group = groupService.findMyGroup(userId)
+        List<GroupSummary> groups = groupService.listMyGroups(userId).stream()
             .map(MeController::toGroupSummary)
-            .orElse(null);
+            .toList();
 
         OpenSession openSession = sessionService.findOpen(userId)
             .map(MeController::toOpenSession)
@@ -77,7 +78,7 @@ public class MeController {
             user.getNaverNickname(),
             user.needsDisplayNameSetup(),
             user.getDefaultGoalMinutes(),
-            group,
+            groups,
             openSession
         );
     }
@@ -114,7 +115,7 @@ public class MeController {
         String naverNickname,
         boolean needsDisplayNameSetup,
         int defaultGoalMinutes,
-        GroupSummary group,
+        List<GroupSummary> groups,
         OpenSession openSession
     ) {
     }
