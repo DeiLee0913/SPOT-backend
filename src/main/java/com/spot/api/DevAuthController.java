@@ -40,7 +40,7 @@ public class DevAuthController {
     @PostMapping("/token")
     public ApiResponse<TokenResponse> issueToken(@RequestBody(required = false) DevTokenRequest request) {
         String key = (request != null && StringUtils.hasText(request.key())) ? request.key().trim() : "dev-user";
-        String nickname = (request != null && StringUtils.hasText(request.nickname()))
+        String naverNickname = (request != null && StringUtils.hasText(request.nickname()))
             ? request.nickname().trim()
             : "개발자-" + key;
 
@@ -48,16 +48,26 @@ public class DevAuthController {
             AuthProvider.NAVER,
             "dev-" + key,
             null,
-            nickname,
+            naverNickname,
             defaultGoalMinutes
         );
         String token = jwtService.generateToken(user.getId());
-        return ApiResponse.ok(new TokenResponse(token, user.getId(), user.getNickname()));
+        return ApiResponse.ok(new TokenResponse(
+            token,
+            user.getId(),
+            user.resolvedDisplayName(),
+            user.needsDisplayNameSetup()
+        ));
     }
 
     public record DevTokenRequest(String key, String nickname) {
     }
 
-    public record TokenResponse(String token, Long userId, String nickname) {
+    public record TokenResponse(
+        String token,
+        Long userId,
+        String nickname,
+        boolean needsDisplayNameSetup
+    ) {
     }
 }

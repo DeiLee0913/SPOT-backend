@@ -44,12 +44,22 @@ public class AuthController {
             throw new BadRequestException("INVALID_OAUTH_PARAM", "code와 state가 필요합니다.");
         }
         AuthResult result = authService.loginWithNaver(request.code(), request.state());
-        return ApiResponse.ok(new LoginResponse(result.token(), result.userId(), result.nickname()));
+        return ApiResponse.ok(new LoginResponse(
+            result.token(),
+            result.userId(),
+            result.nickname(),
+            result.needsDisplayNameSetup()
+        ));
     }
 
     public record NaverLoginRequest(@NotBlank String code, @NotBlank String state) {
     }
 
-    public record LoginResponse(String token, Long userId, String nickname) {
+    public record LoginResponse(
+        String token,
+        Long userId,
+        String nickname,
+        boolean needsDisplayNameSetup
+    ) {
     }
 }

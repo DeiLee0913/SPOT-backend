@@ -12,6 +12,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import org.springframework.util.StringUtils;
 
 @Entity
 @Table(
@@ -22,6 +23,9 @@ import java.time.Instant;
     )
 )
 public class User {
+
+    public static final int MIN_DISPLAY_NAME_LENGTH = 1;
+    public static final int MAX_DISPLAY_NAME_LENGTH = 20;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,8 +41,11 @@ public class User {
     @Column
     private String email;
 
-    @Column(nullable = false)
-    private String nickname;
+    @Column(name = "naver_nickname")
+    private String naverNickname;
+
+    @Column(name = "display_name", length = 50)
+    private String displayName;
 
     @Column(name = "default_goal_minutes", nullable = false)
     private int defaultGoalMinutes;
@@ -59,11 +66,17 @@ public class User {
     protected User() {
     }
 
-    public User(AuthProvider provider, String providerId, String email, String nickname, int defaultGoalMinutes) {
+    public User(
+        AuthProvider provider,
+        String providerId,
+        String email,
+        String naverNickname,
+        int defaultGoalMinutes
+    ) {
         this.provider = provider;
         this.providerId = providerId;
         this.email = email;
-        this.nickname = nickname;
+        this.naverNickname = normalizeOptional(naverNickname);
         this.defaultGoalMinutes = defaultGoalMinutes;
         this.status = UserStatus.ACTIVE;
     }
@@ -72,10 +85,10 @@ public class User {
         AuthProvider provider,
         String providerId,
         String email,
-        String nickname,
+        String naverNickname,
         int defaultGoalMinutes
     ) {
-        return new User(provider, providerId, email, nickname, defaultGoalMinutes);
+        return new User(provider, providerId, email, naverNickname, defaultGoalMinutes);
     }
 
     @PrePersist
@@ -94,16 +107,51 @@ public class User {
         this.defaultGoalMinutes = defaultGoalMinutes;
     }
 
-    public void changeNickname(String nickname) {
-        this.nickname = nickname;
+    public void updateNaverNickname(String naverNickname) {
+        this.naverNickname = normalizeOptional(naverNickname);
+    }
+
+    public void changeDisplayName(String displayName) {
+        this.displayName = normalizeRequired(displayName);
+    }
+
+    /** 그룹·대시보드 등에 노출하는 이름 */
+    public String resolvedDisplayName() {
+        if (StringUtils.hasText(displayName)) {
+            return displayName.trim();
+        }
+        if (StringUtils.hasText(naverNickname)) {
+            return naverNickname.trim();
+        }
+        return "사용자";
+    }
+
+    public boolean needsDisplayNameSetup() {
+        return !StringUtils.hasText(displayName);
     }
 
     public void softDelete() {
         this.status = UserStatus.DELETED;
         this.providerId = "deleted-" + this.id;
         this.email = null;
-        this.nickname = "탈퇴한 사용자";
+        this.naverNickname = null;
+        this.displayName = "탈퇴한 사용자";
         this.deletedAt = Instant.now();
+    }
+
+    private static String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String normalizeRequired(String value) {
+        if (!StringUtils.hasText(value)) {
+            throw new IllegalArgumentException("display name required");
+        }
+        return value.trim();
     }
 
     public Long getId() {
@@ -122,8 +170,12 @@ public class User {
         return email;
     }
 
-    public String getNickname() {
-        return nickname;
+    public String getNaverNickname() {
+        return naverNickname;
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 
     public int getDefaultGoalMinutes() {

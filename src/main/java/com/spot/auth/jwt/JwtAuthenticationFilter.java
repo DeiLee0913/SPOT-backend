@@ -49,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(HttpServletRequest request, User user) {
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(user.getId(), user.getNickname());
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(user.getId(), user.resolvedDisplayName());
         request.setAttribute(AuthenticatedUser.REQUEST_ATTRIBUTE, authenticatedUser);
 
         UsernamePasswordAuthenticationToken authentication =

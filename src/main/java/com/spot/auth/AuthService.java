@@ -43,9 +43,14 @@ public class AuthService {
             defaultGoalMinutes
         );
         String token = jwtService.generateToken(user.getId());
-        return new AuthResult(token, user.getId(), user.getNickname());
+        return new AuthResult(
+            token,
+            user.getId(),
+            user.resolvedDisplayName(),
+            user.needsDisplayNameSetup()
+        );
     }
 
-    public record AuthResult(String token, Long userId, String nickname) {
+    public record AuthResult(String token, Long userId, String nickname, boolean needsDisplayNameSetup) {
     }
 }

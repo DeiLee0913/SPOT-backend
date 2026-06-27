@@ -60,6 +60,7 @@ class AuthTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.token", notNullValue()))
             .andExpect(jsonPath("$.data.nickname", is("민지")))
+            .andExpect(jsonPath("$.data.needsDisplayNameSetup", is(true)))
             .andReturn();
 
         String token = objectMapper.readTree(login.getResponse().getContentAsString())

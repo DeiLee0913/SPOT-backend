@@ -12,6 +12,7 @@ import com.spot.domain.user.User;
 import com.spot.domain.user.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,23 +35,7 @@ public class MeController {
 
     @GetMapping("/me")
     public ApiResponse<MeResponse> me(@CurrentUser AuthenticatedUser currentUser) {
-        User user = userService.getById(currentUser.userId());
-
-        GroupSummary group = groupService.findMyGroup(currentUser.userId())
-            .map(MeController::toGroupSummary)
-            .orElse(null);
-
-        OpenSession openSession = sessionService.findOpen(currentUser.userId())
-            .map(MeController::toOpenSession)
-            .orElse(null);
-
-        return ApiResponse.ok(new MeResponse(
-            user.getId(),
-            user.getNickname(),
-            user.getDefaultGoalMinutes(),
-            group,
-            openSession
-        ));
+        return ApiResponse.ok(buildMeResponse(currentUser.userId()));
     }
 
     @PutMapping("/me/default-goal")
@@ -63,6 +48,38 @@ public class MeController {
         }
         userService.updateDefaultGoal(currentUser.userId(), request.goalMinutes());
         return me(currentUser);
+    }
+
+    @PutMapping("/me/display-name")
+    public ApiResponse<MeResponse> updateDisplayName(
+        @CurrentUser AuthenticatedUser currentUser,
+        @Valid @RequestBody UpdateDisplayNameRequest request
+    ) {
+        userService.updateDisplayName(currentUser.userId(), request.displayName());
+        return me(currentUser);
+    }
+
+    private MeResponse buildMeResponse(Long userId) {
+        User user = userService.getById(userId);
+
+        GroupSummary group = groupService.findMyGroup(userId)
+            .map(MeController::toGroupSummary)
+            .orElse(null);
+
+        OpenSession openSession = sessionService.findOpen(userId)
+            .map(MeController::toOpenSession)
+            .orElse(null);
+
+        return new MeResponse(
+            user.getId(),
+            user.resolvedDisplayName(),
+            user.getDisplayName(),
+            user.getNaverNickname(),
+            user.needsDisplayNameSetup(),
+            user.getDefaultGoalMinutes(),
+            group,
+            openSession
+        );
     }
 
     private static GroupSummary toGroupSummary(MyGroup myGroup) {
@@ -85,9 +102,17 @@ public class MeController {
     ) {
     }
 
+    public record UpdateDisplayNameRequest(
+        @NotBlank(message = "표시 이름을 입력해주세요.") String displayName
+    ) {
+    }
+
     public record MeResponse(
         Long userId,
         String nickname,
+        String displayName,
+        String naverNickname,
+        boolean needsDisplayNameSetup,
         int defaultGoalMinutes,
         GroupSummary group,
         OpenSession openSession

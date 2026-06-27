@@ -142,7 +142,7 @@ public class DashboardService {
 
         MemberAccumulator acc = new MemberAccumulator();
         acc.userId = user.getId();
-        acc.nickname = user.getNickname();
+        acc.nickname = user.resolvedDisplayName();
         acc.todayMinutes = todayMinutes;
         acc.todayGoal = todayGoal;
         acc.rawAchievementRate = round1(rawRate);
