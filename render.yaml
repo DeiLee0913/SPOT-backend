@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: spot-backend
+    name: spot-study-pot-api
     runtime: docker
     plan: free
     region: singapore
