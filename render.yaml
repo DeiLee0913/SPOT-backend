@@ -37,5 +37,3 @@ services:
       # --- CORS (로컬 + Vercel 프론트) ---
       - key: CORS_ALLOWED_ORIGINS
         value: "http://localhost:5173,https://spot-front-omega.vercel.app"
-      - key: SPRING_PROFILES_ACTIVE
-        value: "dev"
