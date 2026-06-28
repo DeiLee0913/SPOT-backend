@@ -7,6 +7,7 @@ import com.spot.common.BadRequestException;
 import com.spot.domain.group.GroupService;
 import com.spot.domain.group.GroupService.MyGroup;
 import com.spot.domain.group.MemberStatus;
+import com.spot.domain.goal.GoalService;
 import com.spot.domain.session.SessionService;
 import com.spot.domain.session.StudySession;
 import com.spot.domain.user.User;
@@ -28,11 +29,18 @@ public class MeController {
     private final UserService userService;
     private final GroupService groupService;
     private final SessionService sessionService;
+    private final GoalService goalService;
 
-    public MeController(UserService userService, GroupService groupService, SessionService sessionService) {
+    public MeController(
+        UserService userService,
+        GroupService groupService,
+        SessionService sessionService,
+        GoalService goalService
+    ) {
         this.userService = userService;
         this.groupService = groupService;
         this.sessionService = sessionService;
+        this.goalService = goalService;
     }
 
     @GetMapping("/me")
@@ -84,6 +92,7 @@ public class MeController {
             user.getDisplayName(),
             user.getNaverNickname(),
             user.needsDisplayNameSetup(),
+            goalService.needsTodayGoalSetup(userId),
             user.getDefaultGoalMinutes(),
             groups,
             group,
@@ -122,6 +131,7 @@ public class MeController {
         String displayName,
         String naverNickname,
         boolean needsDisplayNameSetup,
+        boolean needsTodayGoalSetup,
         int defaultGoalMinutes,
         List<GroupSummary> groups,
         GroupSummary group,

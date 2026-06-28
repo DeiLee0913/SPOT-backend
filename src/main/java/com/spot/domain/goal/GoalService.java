@@ -31,9 +31,29 @@ public class GoalService {
         this.studyDayService = studyDayService;
     }
 
+    /**
+     * 가입 study day에 아직 USER_SET으로 오늘 목표를 정하지 않은 경우 true.
+     * 온보딩 라우팅 및 마감(10:00) 이후에도 첫 설정을 허용할 때 사용한다.
+     */
+    @Transactional(readOnly = true)
+    public boolean needsTodayGoalSetup(Long userId) {
+        User user = getUser(userId);
+        LocalDate today = studyDayService.currentStudyDay();
+        LocalDate joinStudyDay = studyDayService.toStudyDay(user.getCreatedAt());
+        if (!today.equals(joinStudyDay)) {
+            return false;
+        }
+        Optional<DailyGoal> row = dailyGoalRepository.findByUserIdAndStudyDay(userId, today);
+        return row.isEmpty() || row.get().getSource() != GoalSource.USER_SET;
+    }
+
     @Transactional(readOnly = true)
     public TodayGoalView getToday(Long userId) {
         LocalDate today = studyDayService.currentStudyDay();
+        if (needsTodayGoalSetup(userId)) {
+            return new TodayGoalView(today, null, null, studyDayService.isAfterGoalDeadline(today));
+        }
+
         Optional<DailyGoal> row = dailyGoalRepository.findByUserIdAndStudyDay(userId, today);
         if (row.isPresent()) {
             DailyGoal goal = row.get();
@@ -59,7 +79,7 @@ public class GoalService {
             throw new BadRequestException("INVALID_GOAL", "목표 시간은 0분 이상이어야 합니다.");
         }
         LocalDate today = studyDayService.currentStudyDay();
-        if (studyDayService.isAfterGoalDeadline(today)) {
+        if (studyDayService.isAfterGoalDeadline(today) && !needsTodayGoalSetup(userId)) {
             throw new ConflictException("GOAL_DEADLINE_PASSED", "오전 10시 이후에는 오늘 목표를 변경할 수 없습니다.");
         }
 
@@ -88,6 +108,9 @@ public class GoalService {
             return defaultGoalMinutes;
         }
         if (day.isEqual(today) && studyDayService.isAfterGoalDeadline(today)) {
+            if (needsTodayGoalSetup(userId)) {
+                return null;
+            }
             return defaultGoalMinutes;
         }
         return null;
