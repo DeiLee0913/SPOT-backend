@@ -99,6 +99,19 @@ FLUSH PRIVILEGES;
 - `Dockerfile` — 앱 빌드/실행 이미지
 - `render.yaml` — Render 서비스 정의
 
+### Render / Aiven keep-alive (무료 플랜)
+
+| 대상 | GitHub Actions | 수동 (선택) |
+|------|----------------|-------------|
+| Render sleep 방지 | `.github/workflows/render-health-ping.yml` — **12분마다** `/health` | [UptimeRobot](https://uptimerobot.com) HTTP 모니터 → 동일 URL, 5분 간격 |
+| Aiven power-off 방지 | `.github/workflows/aiven-db-keepalive.yml` — **주 1회** `SELECT 1` | Workbench로 월 1회 접속 |
+
+**Aiven workflow용 GitHub Secrets** (Settings → Secrets → Actions):
+
+`AIVEN_DB_HOST`, `AIVEN_DB_PORT` (17030), `AIVEN_DB_USERNAME` (avnadmin), `AIVEN_DB_PASSWORD`, `AIVEN_DB_NAME` (defaultdb)
+
+Actions 탭에서 `Aiven DB keepalive` → **Run workflow** 로 즉시 테스트 가능.
+
 ## 프로젝트 구조
 
 ```
