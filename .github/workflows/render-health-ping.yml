@@ -1,0 +1,26 @@
+# Render 무료 플랜 sleep 방지: /health 주기 호출 (약 12분마다)
+# DB 연결은 없음 — Render 웹 서비스만 깨움
+name: Render health ping
+
+on:
+  schedule:
+    - cron: '*/12 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: render-health-ping
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping Render /health
+        env:
+          RENDER_HEALTH_URL: https://spot-study-pot-api.onrender.com/health
+        run: |
+          echo "Pinging ${RENDER_HEALTH_URL}"
+          curl -fsS --max-time 90 "${RENDER_HEALTH_URL}"
+          echo ""
+          echo "OK"

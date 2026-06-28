@@ -1,0 +1,42 @@
+# Aiven 무료 MySQL inactivity power-off 방지: 주 1회 DB 접속
+name: Aiven DB keepalive
+
+on:
+  schedule:
+    # 매주 월요일 09:00 KST (월 00:00 UTC)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: aiven-db-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+
+      - name: SELECT 1 (keepalive)
+        env:
+          AIVEN_DB_HOST: ${{ secrets.AIVEN_DB_HOST }}
+          AIVEN_DB_PORT: ${{ secrets.AIVEN_DB_PORT }}
+          AIVEN_DB_USERNAME: ${{ secrets.AIVEN_DB_USERNAME }}
+          AIVEN_DB_PASSWORD: ${{ secrets.AIVEN_DB_PASSWORD }}
+          AIVEN_DB_NAME: ${{ secrets.AIVEN_DB_NAME }}
+        run: |
+          if [ -z "${AIVEN_DB_HOST}" ] || [ -z "${AIVEN_DB_PASSWORD}" ]; then
+            echo "Skip: GitHub Secrets (AIVEN_DB_HOST, AIVEN_DB_PASSWORD 등) 미설정"
+            exit 1
+          fi
+          PORT="${AIVEN_DB_PORT:-17030}"
+          USER="${AIVEN_DB_USERNAME:-avnadmin}"
+          DB="${AIVEN_DB_NAME:-defaultdb}"
+          mysql -h "${AIVEN_DB_HOST}" -P "${PORT}" -u "${USER}" \
+            --password="${AIVEN_DB_PASSWORD}" \
+            --ssl-mode=REQUIRED \
+            "${DB}" \
+            -e "SELECT 1 AS keepalive;"
+          echo "Aiven keepalive OK"
