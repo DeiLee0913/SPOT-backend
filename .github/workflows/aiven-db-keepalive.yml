@@ -1,10 +1,10 @@
-# Aiven 무료 MySQL inactivity power-off 방지: 주 1회 DB 접속
+# Aiven 무료 MySQL inactivity power-off 방지: 5시간마다 DB 접속
 name: Aiven DB keepalive
 
 on:
   schedule:
-    # 매주 월요일 09:00 KST (월 00:00 UTC)
-    - cron: '0 0 * * 1'
+    # 매 5시간 (UTC 00, 05, 10, 15, 20시 → KST 09, 14, 19, 00, 05시)
+    - cron: '0 */5 * * *'
   workflow_dispatch:
 
 concurrency:

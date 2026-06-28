@@ -104,7 +104,7 @@ FLUSH PRIVILEGES;
 | 대상 | GitHub Actions | 수동 (선택) |
 |------|----------------|-------------|
 | Render sleep 방지 | `.github/workflows/render-health-ping.yml` — **12분마다** `/health` | [UptimeRobot](https://uptimerobot.com) HTTP 모니터 → 동일 URL, 5분 간격 |
-| Aiven power-off 방지 | `.github/workflows/aiven-db-keepalive.yml` — **주 1회** `SELECT 1` | Workbench로 월 1회 접속 |
+| Aiven power-off 방지 | `.github/workflows/aiven-db-keepalive.yml` — **5시간마다** `SELECT 1` | Workbench로 수동 접속 |
 
 **Aiven workflow용 GitHub Secrets** (Settings → Secrets → Actions):
 
