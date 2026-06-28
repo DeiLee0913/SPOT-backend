@@ -219,7 +219,7 @@
           }
         },
         {
-          "name": "set today goal (10:00 KST 이전, 가입 첫날은 마감 후 1회 허용, 0분 허용)",
+          "name": "set today goal (11:00 KST 이전, 가입 첫날은 마감 후 1회 허용, 0분 허용)",
           "request": {
             "method": "PUT",
             "header": [{ "key": "Content-Type", "value": "application/json" }],

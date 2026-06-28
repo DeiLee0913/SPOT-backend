@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 /**
  * KST 기준 study day 규칙.
  * - 일자 전환: 매일 06:00 KST
- * - 일일 목표 마감: 10:00 KST
+ * - 일일 목표 마감: 11:00 KST
  * - 주간: 월요일~일요일
  */
 @Service
@@ -20,7 +20,7 @@ public class StudyDayService {
 
     public static final ZoneId KST = ZoneId.of("Asia/Seoul");
     public static final int RESET_HOUR = 6;
-    public static final int GOAL_DEADLINE_HOUR = 10;
+    public static final int GOAL_DEADLINE_HOUR = 11;
 
     private final Clock clock;
 

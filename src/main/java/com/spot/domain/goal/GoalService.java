@@ -33,7 +33,7 @@ public class GoalService {
 
     /**
      * 가입 study day에 아직 USER_SET으로 오늘 목표를 정하지 않은 경우 true.
-     * 온보딩 라우팅 및 마감(10:00) 이후에도 첫 설정을 허용할 때 사용한다.
+     * 온보딩 라우팅 및 마감(11:00) 이후에도 첫 설정을 허용할 때 사용한다.
      */
     @Transactional(readOnly = true)
     public boolean needsTodayGoalSetup(Long userId) {
@@ -80,7 +80,7 @@ public class GoalService {
         }
         LocalDate today = studyDayService.currentStudyDay();
         if (studyDayService.isAfterGoalDeadline(today) && !needsTodayGoalSetup(userId)) {
-            throw new ConflictException("GOAL_DEADLINE_PASSED", "오전 10시 이후에는 오늘 목표를 변경할 수 없습니다.");
+            throw new ConflictException("GOAL_DEADLINE_PASSED", "오전 11시 이후에는 오늘 목표를 변경할 수 없습니다.");
         }
 
         return dailyGoalRepository.findByUserIdAndStudyDay(userId, today)
@@ -95,7 +95,7 @@ public class GoalService {
 
     /**
      * 점수·히스토리·대시보드용 일자별 유효 목표.
-     * 명시적으로 설정된 목표가 없더라도 마감(10:00)이 지난 날은 사용자 DEFAULT가 적용된 것으로 본다.
+     * 명시적으로 설정된 목표가 없더라도 마감(11:00)이 지난 날은 사용자 DEFAULT가 적용된 것으로 본다.
      */
     @Transactional(readOnly = true)
     public Integer effectiveGoalForDay(Long userId, LocalDate day, int defaultGoalMinutes) {
@@ -117,7 +117,7 @@ public class GoalService {
     }
 
     /**
-     * 10:00 마감 스케줄러: 해당 study day에 일일 목표가 없는 ACTIVE 사용자에게
+     * 11:00 마감 스케줄러: 해당 study day에 일일 목표가 없는 ACTIVE 사용자에게
      * 본인 DEFAULT 목표를 스냅샷(DEFAULT_APPLIED)으로 확정한다. 재실행해도 안전(idempotent)하다.
      *
      * @return 새로 생성된 일일 목표 수

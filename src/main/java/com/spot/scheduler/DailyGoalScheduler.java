@@ -21,9 +21,9 @@ public class DailyGoalScheduler {
     }
 
     /**
-     * 매일 10:00 KST — 일일 목표 미설정 사용자에게 DEFAULT 목표를 확정한다.
+     * 매일 11:00 KST — 일일 목표 미설정 사용자에게 DEFAULT 목표를 확정한다.
      */
-    @Scheduled(cron = "0 0 10 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 11 * * *", zone = "Asia/Seoul")
     public void applyDefaultGoals() {
         int created = goalService.applyDefaultGoals(studyDayService.currentStudyDay());
         log.info("[ApplyDefaultGoals] studyDay={} created={}", studyDayService.currentStudyDay(), created);

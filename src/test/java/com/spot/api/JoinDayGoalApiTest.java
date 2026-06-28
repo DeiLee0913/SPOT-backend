@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class JoinDayGoalApiTest {
 
-    // 2026-06-27 14:00 KST → study day 2026-06-27, 10:00 마감 이후
+    // 2026-06-27 14:00 KST → study day 2026-06-27, 11:00 마감 이후
     private static final Instant AFTERNOON = Instant.parse("2026-06-27T05:00:00Z");
     private static final AtomicInteger SEQ = new AtomicInteger();
 

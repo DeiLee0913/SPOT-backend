@@ -35,7 +35,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc
 class CoreApiTest {
 
-    // 2026-06-27 09:00 KST → study day 2026-06-27, 10:00 마감 이전
+    // 2026-06-27 09:00 KST → study day 2026-06-27, 11:00 마감 이전
     private static final Instant FIXED_NOW = Instant.parse("2026-06-27T00:00:00Z");
     private static final AtomicInteger SEQ = new AtomicInteger();
 
@@ -167,7 +167,7 @@ class CoreApiTest {
     void goalAndSessionFlow() throws Exception {
         String user = newUserToken("학생");
 
-        // 오늘 목표 설정 (10:00 이전이므로 허용)
+        // 오늘 목표 설정 (11:00 이전이므로 허용)
         mockMvc.perform(asUser(put("/goals/today"), user)
                 .content("{\"goalMinutes\":120}"))
             .andExpect(status().isOk())

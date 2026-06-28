@@ -13,11 +13,11 @@ class StudyDayServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 6, 27);
 
     @Test
-    void goalDeadlineIsTenAmKst() {
-        Clock atNineFiftyNine = Clock.fixed(Instant.parse("2026-06-27T00:59:00Z"), ZoneOffset.UTC); // 09:59 KST
-        assertThat(new StudyDayService(atNineFiftyNine).isAfterGoalDeadline(TODAY)).isFalse();
+    void goalDeadlineIsElevenAmKst() {
+        Clock atTenFiftyNine = Clock.fixed(Instant.parse("2026-06-27T01:59:00Z"), ZoneOffset.UTC); // 10:59 KST
+        assertThat(new StudyDayService(atTenFiftyNine).isAfterGoalDeadline(TODAY)).isFalse();
 
-        Clock atTen = Clock.fixed(Instant.parse("2026-06-27T01:00:00Z"), ZoneOffset.UTC); // 10:00 KST
-        assertThat(new StudyDayService(atTen).isAfterGoalDeadline(TODAY)).isTrue();
+        Clock atEleven = Clock.fixed(Instant.parse("2026-06-27T02:00:00Z"), ZoneOffset.UTC); // 11:00 KST
+        assertThat(new StudyDayService(atEleven).isAfterGoalDeadline(TODAY)).isTrue();
     }
 }

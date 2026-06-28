@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Primary;
 @SpringBootTest
 class SchedulerTest {
 
-    // 2026-06-27 09:00 KST → 현재 study day 2026-06-27, 10:00 마감 이전
+    // 2026-06-27 09:00 KST → 현재 study day 2026-06-27, 11:00 마감 이전
     private static final Instant FIXED_NOW = Instant.parse("2026-06-27T00:00:00Z");
     private static final LocalDate TODAY = LocalDate.of(2026, 6, 27);
 
