@@ -31,7 +31,9 @@ public final class SessionDtos {
         Instant startedAt,
         Instant endedAt,
         Integer durationMinutes,
-        LocalDate studyDay
+        LocalDate studyDay,
+        Integer activeDurationSeconds,
+        Instant lastResumedAt
     ) {
         public static SessionResponse from(StudySession session) {
             return new SessionResponse(
@@ -42,7 +44,9 @@ public final class SessionDtos {
                 session.getStartedAt(),
                 session.getEndedAt(),
                 session.getDurationMinutes(),
-                session.getStudyDay()
+                session.getStudyDay(),
+                session.getActiveDurationSeconds(),
+                session.getLastResumedAt()
             );
         }
     }

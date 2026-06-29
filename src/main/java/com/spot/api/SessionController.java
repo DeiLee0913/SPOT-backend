@@ -50,6 +50,24 @@ public class SessionController {
         return ApiResponse.ok(SessionResponse.from(session));
     }
 
+    @PostMapping("/{sessionId}/pause")
+    public ApiResponse<SessionResponse> pause(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long sessionId
+    ) {
+        StudySession session = sessionService.pause(currentUser.userId(), sessionId);
+        return ApiResponse.ok(SessionResponse.from(session));
+    }
+
+    @PostMapping("/{sessionId}/resume")
+    public ApiResponse<SessionResponse> resume(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long sessionId
+    ) {
+        StudySession session = sessionService.resume(currentUser.userId(), sessionId);
+        return ApiResponse.ok(SessionResponse.from(session));
+    }
+
     @PostMapping("/manual")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<SessionResponse> manual(

@@ -33,7 +33,7 @@ public class SessionService {
     @Transactional
     public StudySession start(Long userId, String rawCategory) {
         String category = validateCategory(rawCategory);
-        sessionRepository.findByUserIdAndStatus(userId, SessionStatus.OPEN).ifPresent(s -> {
+        findActive(userId).ifPresent(s -> {
             throw new ConflictException("SESSION_ALREADY_OPEN", "진행 중인 세션이 있습니다.");
         });
         Instant now = studyDayService.now();
@@ -43,9 +43,32 @@ public class SessionService {
     }
 
     @Transactional
-    public StudySession end(Long userId, Long sessionId) {
+    public StudySession pause(Long userId, Long sessionId) {
         StudySession session = getOwnedSession(userId, sessionId);
         if (session.getStatus() != SessionStatus.OPEN) {
+            throw new ConflictException("SESSION_NOT_RUNNING", "진행 중인 타이머 세션이 아닙니다.");
+        }
+        if (session.getSource() != SessionSource.TIMER) {
+            throw new ConflictException("SESSION_NOT_RUNNING", "타이머 세션만 일시정지할 수 있습니다.");
+        }
+        session.pause(studyDayService.now());
+        return session;
+    }
+
+    @Transactional
+    public StudySession resume(Long userId, Long sessionId) {
+        StudySession session = getOwnedSession(userId, sessionId);
+        if (session.getStatus() != SessionStatus.PAUSED) {
+            throw new ConflictException("SESSION_NOT_PAUSED", "일시정지된 세션이 아닙니다.");
+        }
+        session.resume(studyDayService.now());
+        return session;
+    }
+
+    @Transactional
+    public StudySession end(Long userId, Long sessionId) {
+        StudySession session = getOwnedSession(userId, sessionId);
+        if (session.getStatus() != SessionStatus.OPEN && session.getStatus() != SessionStatus.PAUSED) {
             throw new ConflictException("SESSION_NOT_OPEN", "진행 중인 세션이 아닙니다.");
         }
         session.close(studyDayService.now());
@@ -62,26 +85,23 @@ public class SessionService {
         return sessionRepository.save(StudySession.manual(userId, studyDay, category, startedAt, endedAt));
     }
 
-    /**
-     * 세션 삭제. 등록 후 수정은 불가하고, 타이머/수동 구분 없이 본인 세션이면 삭제만 허용한다.
-     */
     @Transactional
     public void deleteSession(Long userId, Long sessionId) {
         StudySession session = getOwnedSession(userId, sessionId);
         sessionRepository.delete(session);
     }
 
-    /**
-     * 06:00 스케줄러: study day가 지난 OPEN 세션을 경계 시각(해당 study day 다음날 06:00 KST)으로 강제 종료한다.
-     * duration은 start ~ 경계 시각으로 계산된다. 재실행해도 안전(idempotent)하다.
-     *
-     * @return 강제 종료된 세션 수
-     */
     @Transactional
     public int closeCrossDaySessions() {
         LocalDate currentStudyDay = studyDayService.currentStudyDay();
-        List<StudySession> stale = sessionRepository.findByStatusAndStudyDayBefore(
-            SessionStatus.OPEN, currentStudyDay);
+        int closed = 0;
+        closed += closeStaleSessions(SessionStatus.OPEN, currentStudyDay);
+        closed += closeStaleSessions(SessionStatus.PAUSED, currentStudyDay);
+        return closed;
+    }
+
+    private int closeStaleSessions(SessionStatus status, LocalDate currentStudyDay) {
+        List<StudySession> stale = sessionRepository.findByStatusAndStudyDayBefore(status, currentStudyDay);
         for (StudySession session : stale) {
             Instant boundary = session.getStudyDay()
                 .plusDays(1)
@@ -98,9 +118,18 @@ public class SessionService {
         return sessionRepository.findByUserIdAndStudyDay(userId, studyDayService.currentStudyDay());
     }
 
+    /** OPEN 또는 PAUSED 타이머 세션 (진행 중) */
     @Transactional(readOnly = true)
     public Optional<StudySession> findOpen(Long userId) {
-        return sessionRepository.findByUserIdAndStatus(userId, SessionStatus.OPEN);
+        return findActive(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<StudySession> findActive(Long userId) {
+        return sessionRepository.findByUserIdAndStatusIn(
+            userId,
+            List.of(SessionStatus.OPEN, SessionStatus.PAUSED)
+        );
     }
 
     private StudySession getOwnedSession(Long userId, Long sessionId) {
@@ -147,11 +176,15 @@ public class SessionService {
     }
 
     private void ensureNoOverlap(Long userId, Instant startedAt, Instant endedAt) {
-        Instant now = studyDayService.now();
         boolean overlap = sessionRepository.findByUserId(userId).stream()
             .anyMatch(s -> {
+                if (s.getStatus() == SessionStatus.CLOSED) {
+                    Instant sStart = s.getStartedAt();
+                    Instant sEnd = s.getEndedAt();
+                    return sStart.isBefore(endedAt) && startedAt.isBefore(sEnd);
+                }
                 Instant sStart = s.getStartedAt();
-                Instant sEnd = s.getStatus() == SessionStatus.CLOSED ? s.getEndedAt() : now;
+                Instant sEnd = s.activeEndInstant(studyDayService.now());
                 return sStart.isBefore(endedAt) && startedAt.isBefore(sEnd);
             });
         if (overlap) {

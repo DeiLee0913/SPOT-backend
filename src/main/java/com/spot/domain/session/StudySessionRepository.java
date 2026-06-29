@@ -1,6 +1,7 @@
 package com.spot.domain.session;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface StudySessionRepository extends JpaRepository<StudySession, Long> {
 
     Optional<StudySession> findByUserIdAndStatus(Long userId, SessionStatus status);
+
+    Optional<StudySession> findByUserIdAndStatusIn(Long userId, Collection<SessionStatus> statuses);
 
     List<StudySession> findByStatusAndStudyDayBefore(SessionStatus status, LocalDate studyDay);
 

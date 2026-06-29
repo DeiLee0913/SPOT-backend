@@ -257,6 +257,22 @@
           }
         },
         {
+          "name": "pause timer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/pause", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "pause"] }
+          }
+        },
+        {
+          "name": "resume timer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/resume", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "resume"] }
+          }
+        },
+        {
           "name": "end timer",
           "request": {
             "method": "POST",

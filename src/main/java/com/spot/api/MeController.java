@@ -110,7 +110,14 @@ public class MeController {
     }
 
     private static OpenSession toOpenSession(StudySession session) {
-        return new OpenSession(session.getId(), session.getCategory(), session.getStartedAt());
+        return new OpenSession(
+            session.getId(),
+            session.getCategory(),
+            session.getStatus().name(),
+            session.getStartedAt(),
+            session.getActiveDurationSeconds(),
+            session.getLastResumedAt()
+        );
     }
 
     public record UpdateDefaultGoalRequest(
@@ -142,6 +149,13 @@ public class MeController {
     public record GroupSummary(Long id, String name, String role, String memberStatus) {
     }
 
-    public record OpenSession(Long sessionId, String category, Instant startedAt) {
+    public record OpenSession(
+        Long sessionId,
+        String category,
+        String status,
+        Instant startedAt,
+        int activeDurationSeconds,
+        Instant lastResumedAt
+    ) {
     }
 }

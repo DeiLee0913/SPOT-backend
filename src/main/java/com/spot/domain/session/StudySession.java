@@ -55,6 +55,15 @@ public class StudySession {
     @Column(name = "duration_minutes")
     private Integer durationMinutes;
 
+    @Column(name = "active_duration_seconds", nullable = false)
+    private int activeDurationSeconds;
+
+    @Column(name = "last_resumed_at")
+    private Instant lastResumedAt;
+
+    @Column(name = "paused_at")
+    private Instant pausedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -69,7 +78,10 @@ public class StudySession {
         SessionStatus status,
         Instant startedAt,
         Instant endedAt,
-        Integer durationMinutes
+        Integer durationMinutes,
+        int activeDurationSeconds,
+        Instant lastResumedAt,
+        Instant pausedAt
     ) {
         this.userId = userId;
         this.studyDay = studyDay;
@@ -79,10 +91,25 @@ public class StudySession {
         this.startedAt = startedAt;
         this.endedAt = endedAt;
         this.durationMinutes = durationMinutes;
+        this.activeDurationSeconds = activeDurationSeconds;
+        this.lastResumedAt = lastResumedAt;
+        this.pausedAt = pausedAt;
     }
 
     public static StudySession openTimer(Long userId, LocalDate studyDay, String category, Instant startedAt) {
-        return new StudySession(userId, studyDay, category, SessionSource.TIMER, SessionStatus.OPEN, startedAt, null, null);
+        return new StudySession(
+            userId,
+            studyDay,
+            category,
+            SessionSource.TIMER,
+            SessionStatus.OPEN,
+            startedAt,
+            null,
+            null,
+            0,
+            startedAt,
+            null
+        );
     }
 
     public static StudySession manual(
@@ -100,7 +127,10 @@ public class StudySession {
             SessionStatus.CLOSED,
             startedAt,
             endedAt,
-            toMinutes(startedAt, endedAt)
+            toMinutes(startedAt, endedAt),
+            0,
+            null,
+            null
         );
     }
 
@@ -109,14 +139,60 @@ public class StudySession {
         this.createdAt = Instant.now();
     }
 
+    public void pause(Instant now) {
+        if (status != SessionStatus.OPEN) {
+            throw new IllegalStateException("OPEN 세션만 일시정지할 수 있습니다.");
+        }
+        if (lastResumedAt != null) {
+            activeDurationSeconds += (int) Duration.between(lastResumedAt, now).getSeconds();
+        }
+        lastResumedAt = null;
+        pausedAt = now;
+        status = SessionStatus.PAUSED;
+    }
+
+    public void resume(Instant now) {
+        if (status != SessionStatus.PAUSED) {
+            throw new IllegalStateException("PAUSED 세션만 재개할 수 있습니다.");
+        }
+        pausedAt = null;
+        lastResumedAt = now;
+        status = SessionStatus.OPEN;
+    }
+
+    public int effectiveDurationSeconds(Instant now) {
+        if (status == SessionStatus.CLOSED && durationMinutes != null) {
+            return durationMinutes * 60;
+        }
+        int total = activeDurationSeconds;
+        if (status == SessionStatus.OPEN && lastResumedAt != null) {
+            total += (int) Duration.between(lastResumedAt, now).getSeconds();
+        }
+        return Math.max(0, total);
+    }
+
     public void close(Instant endedAt) {
         this.endedAt = endedAt;
-        this.durationMinutes = toMinutes(this.startedAt, endedAt);
+        this.durationMinutes = toMinutesFromSeconds(effectiveDurationSeconds(endedAt));
         this.status = SessionStatus.CLOSED;
+        this.lastResumedAt = null;
+        this.pausedAt = null;
+    }
+
+    public Instant activeEndInstant(Instant now) {
+        return switch (status) {
+            case CLOSED -> endedAt;
+            case PAUSED -> pausedAt != null ? pausedAt : now;
+            case OPEN -> now;
+        };
     }
 
     private static int toMinutes(Instant startedAt, Instant endedAt) {
-        return (int) Duration.between(startedAt, endedAt).toMinutes();
+        return toMinutesFromSeconds((int) Duration.between(startedAt, endedAt).getSeconds());
+    }
+
+    private static int toMinutesFromSeconds(int seconds) {
+        return seconds / 60;
     }
 
     public Long getId() {
@@ -153,6 +229,18 @@ public class StudySession {
 
     public Integer getDurationMinutes() {
         return durationMinutes;
+    }
+
+    public int getActiveDurationSeconds() {
+        return activeDurationSeconds;
+    }
+
+    public Instant getLastResumedAt() {
+        return lastResumedAt;
+    }
+
+    public Instant getPausedAt() {
+        return pausedAt;
     }
 
     public Instant getCreatedAt() {

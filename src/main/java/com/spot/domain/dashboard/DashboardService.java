@@ -18,6 +18,7 @@ import com.spot.domain.session.StudySession;
 import com.spot.domain.session.StudySessionRepository;
 import com.spot.domain.user.User;
 import com.spot.domain.user.UserRepository;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -114,6 +115,12 @@ public class DashboardService {
         }
 
         int todayMinutes = minutesByDay.getOrDefault(today, 0);
+        Instant now = studyDayService.now();
+        for (StudySession active : sessionRepository.findByUserIdAndStudyDay(user.getId(), today)) {
+            if (active.getStatus() == SessionStatus.OPEN || active.getStatus() == SessionStatus.PAUSED) {
+                todayMinutes += active.effectiveDurationSeconds(now) / 60;
+            }
+        }
         Integer todayGoal = effectiveGoal(today, goalByDay, today, afterDeadlineToday, defaultGoal);
 
         List<HistoryDay> history = new ArrayList<>();
