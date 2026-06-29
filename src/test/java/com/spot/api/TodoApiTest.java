@@ -3,6 +3,7 @@ package com.spot.api;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -215,6 +216,57 @@ class TodoApiTest {
             .andExpect(jsonPath("$.data.priority").value(nullValue()))
             .andExpect(jsonPath("$.data.dueStudyDay").value(nullValue()))
             .andExpect(jsonPath("$.data.tags", hasSize(0)));
+    }
+
+    @Test
+    void manageCategoriesAndTags() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Spring\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"work\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId = dataNode(tag).get("tagId").asLong();
+
+        MvcResult todo = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {"title":"Tagged","categoryId":%d,"tagIds":[%d],"dueStudyDay":"2026-06-27"}
+                    """.formatted(categoryId, tagId)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long todoId = dataNode(todo).get("todoId").asLong();
+
+        mockMvc.perform(asUser(patch("/todos/categories/" + categoryId), token)
+                .content("{\"name\":\"Backend\",\"color\":\"#111827\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name", is("Backend")));
+
+        mockMvc.perform(asUser(patch("/todos/tags/" + tagId), token)
+                .content("{\"name\":\"focus\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name", is("focus")));
+
+        mockMvc.perform(asUser(delete("/todos/categories/" + categoryId), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success", is(true)));
+
+        mockMvc.perform(asUser(get("/todos"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.today[0].todoId", is((int) todoId)))
+            .andExpect(jsonPath("$.data.today[0].category").value(nullValue()));
+
+        mockMvc.perform(asUser(delete("/todos/tags/" + tagId), token))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(get("/todos/tags"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(0)));
     }
 
     @Test

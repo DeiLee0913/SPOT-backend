@@ -51,6 +51,17 @@ public final class TodoDtos {
     ) {
     }
 
+    public record UpdateCategoryRequest(
+        String name,
+        String color
+    ) {
+    }
+
+    public record UpdateTagRequest(
+        String name
+    ) {
+    }
+
     public record CategoryResponse(Long categoryId, String name, String color) {
         public static CategoryResponse from(TodoCategory category) {
             return new CategoryResponse(category.getId(), category.getName(), category.getColor());

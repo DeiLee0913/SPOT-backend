@@ -198,6 +198,73 @@ public class TodoService {
             .orElseGet(() -> tagRepository.save(new TodoTag(userId, name)));
     }
 
+    @Transactional
+    public TodoCategory updateCategory(Long userId, Long categoryId, String rawName, String color) {
+        TodoCategory category = getOwnedCategory(userId, categoryId);
+        if (rawName != null) {
+            String name = validateName(rawName);
+            ensureUniqueCategoryName(userId, categoryId, name);
+            category.setName(name);
+        }
+        if (color != null) {
+            category.setColor(normalizeColor(color));
+        }
+        return category;
+    }
+
+    @Transactional
+    public void deleteCategory(Long userId, Long categoryId) {
+        getOwnedCategory(userId, categoryId);
+        todoItemRepository.findByUserIdAndCategory_Id(userId, categoryId)
+            .forEach(item -> item.assignCategory(null));
+        categoryRepository.deleteById(categoryId);
+    }
+
+    @Transactional
+    public TodoTag updateTag(Long userId, Long tagId, String rawName) {
+        TodoTag tag = getOwnedTag(userId, tagId);
+        if (rawName != null) {
+            String name = validateName(rawName);
+            ensureUniqueTagName(userId, tagId, name);
+            tag.setName(name);
+        }
+        return tag;
+    }
+
+    @Transactional
+    public void deleteTag(Long userId, Long tagId) {
+        TodoTag tag = getOwnedTag(userId, tagId);
+        todoItemRepository.findByUserIdAndTagId(userId, tagId)
+            .forEach(item -> item.getTags().remove(tag));
+        tagRepository.delete(tag);
+    }
+
+    private TodoCategory getOwnedCategory(Long userId, Long categoryId) {
+        return categoryRepository.findByIdAndUserId(categoryId, userId)
+            .orElseThrow(() -> new NotFoundException("CATEGORY_NOT_FOUND", "카테고리를 찾을 수 없습니다."));
+    }
+
+    private TodoTag getOwnedTag(Long userId, Long tagId) {
+        return tagRepository.findByIdAndUserId(tagId, userId)
+            .orElseThrow(() -> new NotFoundException("TAG_NOT_FOUND", "태그를 찾을 수 없습니다."));
+    }
+
+    private void ensureUniqueCategoryName(Long userId, Long categoryId, String name) {
+        categoryRepository.findByUserIdAndName(userId, name)
+            .filter(existing -> !existing.getId().equals(categoryId))
+            .ifPresent(existing -> {
+                throw new ConflictException("CATEGORY_ALREADY_EXISTS", "이미 있는 카테고리입니다.");
+            });
+    }
+
+    private void ensureUniqueTagName(Long userId, Long tagId, String name) {
+        tagRepository.findByUserIdAndName(userId, name)
+            .filter(existing -> !existing.getId().equals(tagId))
+            .ifPresent(existing -> {
+                throw new ConflictException("TAG_ALREADY_EXISTS", "이미 있는 태그입니다.");
+            });
+    }
+
     private List<TodoItem> loadDoneForDay(Long userId, LocalDate studyDay) {
         Instant dayStart = studyDay.atTime(StudyDayService.RESET_HOUR, 0).atZone(StudyDayService.KST).toInstant();
         Instant dayEnd = studyDay.plusDays(1).atTime(StudyDayService.RESET_HOUR, 0).atZone(StudyDayService.KST).toInstant();

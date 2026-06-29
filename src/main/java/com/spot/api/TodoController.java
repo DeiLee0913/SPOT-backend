@@ -8,6 +8,8 @@ import com.spot.api.dto.TodoDtos.QuickCreateRequest;
 import com.spot.api.dto.TodoDtos.TagResponse;
 import com.spot.api.dto.TodoDtos.TodoDayResponse;
 import com.spot.api.dto.TodoDtos.TodoItemResponse;
+import com.spot.api.dto.TodoDtos.UpdateCategoryRequest;
+import com.spot.api.dto.TodoDtos.UpdateTagRequest;
 import com.spot.api.dto.TodoDtos.UpdateTodoRequest;
 import com.spot.auth.AuthenticatedUser;
 import com.spot.auth.CurrentUser;
@@ -23,6 +25,7 @@ import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -153,6 +156,30 @@ public class TodoController {
         return ApiResponse.ok(CategoryResponse.from(category));
     }
 
+    @PatchMapping("/categories/{categoryId}")
+    public ApiResponse<CategoryResponse> updateCategory(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long categoryId,
+        @Valid @RequestBody UpdateCategoryRequest request
+    ) {
+        TodoCategory category = todoService.updateCategory(
+            currentUser.userId(),
+            categoryId,
+            request.name(),
+            request.color()
+        );
+        return ApiResponse.ok(CategoryResponse.from(category));
+    }
+
+    @DeleteMapping("/categories/{categoryId}")
+    public ApiResponse<Void> deleteCategory(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long categoryId
+    ) {
+        todoService.deleteCategory(currentUser.userId(), categoryId);
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/tags")
     public ApiResponse<List<TagResponse>> listTags(@CurrentUser AuthenticatedUser currentUser) {
         List<TagResponse> tags = todoService.listTags(currentUser.userId()).stream()
@@ -169,6 +196,25 @@ public class TodoController {
     ) {
         TodoTag tag = todoService.createTag(currentUser.userId(), request.name());
         return ApiResponse.ok(TagResponse.from(tag));
+    }
+
+    @PatchMapping("/tags/{tagId}")
+    public ApiResponse<TagResponse> updateTag(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long tagId,
+        @Valid @RequestBody UpdateTagRequest request
+    ) {
+        TodoTag tag = todoService.updateTag(currentUser.userId(), tagId, request.name());
+        return ApiResponse.ok(TagResponse.from(tag));
+    }
+
+    @DeleteMapping("/tags/{tagId}")
+    public ApiResponse<Void> deleteTag(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long tagId
+    ) {
+        todoService.deleteTag(currentUser.userId(), tagId);
+        return ApiResponse.ok(null);
     }
 
     private static TodoDayResponse toDayResponse(TodoDayView view) {

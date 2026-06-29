@@ -44,4 +44,10 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
     List<TodoItem> findByIdIn(Collection<Long> ids);
 
     List<TodoItem> findByUserIdAndCategory_Id(Long userId, Long categoryId);
+
+    @Query("""
+        select distinct t from TodoItem t join t.tags tag
+        where t.userId = :userId and tag.id = :tagId
+        """)
+    List<TodoItem> findByUserIdAndTagId(@Param("userId") Long userId, @Param("tagId") Long tagId);
 }
