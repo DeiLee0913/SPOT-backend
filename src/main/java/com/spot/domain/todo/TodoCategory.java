@@ -66,6 +66,14 @@ public class TodoCategory {
         return color;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

@@ -147,6 +147,77 @@ class TodoApiTest {
     }
 
     @Test
+    void saveTodoWithFrontendPayload() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Spring\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag1 = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"work\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId1 = dataNode(tag1).get("tagId").asLong();
+
+        MvcResult tag2 = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"study\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId2 = dataNode(tag2).get("tagId").asLong();
+
+        MvcResult created = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {"title":"Draft","categoryId":%d,"tagIds":[%d],"priority":1,"dueStudyDay":"2026-06-27"}
+                    """.formatted(categoryId, tagId1)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success", is(true)))
+            .andReturn();
+        long todoId = dataNode(created).get("todoId").asLong();
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "title": "API spec",
+                      "categoryId": %d,
+                      "clearCategory": false,
+                      "tagIds": [%d, %d],
+                      "priority": 2,
+                      "dueStudyDay": "2026-06-30",
+                      "clearDue": false
+                    }
+                    """.formatted(categoryId, tagId1, tagId2)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success", is(true)))
+            .andExpect(jsonPath("$.data.title", is("API spec")))
+            .andExpect(jsonPath("$.data.priority", is(2)))
+            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-30")))
+            .andExpect(jsonPath("$.data.tags.length()", is(2)));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "title": "Undated",
+                      "categoryId": null,
+                      "clearCategory": true,
+                      "tagIds": [],
+                      "priority": null,
+                      "dueStudyDay": null,
+                      "clearDue": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success", is(true)))
+            .andExpect(jsonPath("$.data.title", is("Undated")))
+            .andExpect(jsonPath("$.data.category").value(nullValue()))
+            .andExpect(jsonPath("$.data.priority").value(nullValue()))
+            .andExpect(jsonPath("$.data.dueStudyDay").value(nullValue()))
+            .andExpect(jsonPath("$.data.tags", hasSize(0)));
+    }
+
+    @Test
     void linkTodoToSession() throws Exception {
         String token = newUserToken();
 

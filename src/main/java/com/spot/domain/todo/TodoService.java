@@ -113,10 +113,6 @@ public class TodoService {
         if (rawTitle != null) {
             item.setTitle(validateTitle(rawTitle));
         }
-        if (priority != null) {
-            validatePriority(priority);
-            item.setPriority(priority);
-        }
         if (clearCategory) {
             item.assignCategory(null);
         } else if (categoryId != null) {
@@ -129,8 +125,13 @@ public class TodoService {
         }
         if (tagIds != null) {
             applyTags(userId, item, tagIds);
+            validatePriority(priority);
+            item.setPriority(priority);
+        } else if (priority != null) {
+            validatePriority(priority);
+            item.setPriority(priority);
         }
-        return item;
+        return getOwned(userId, todoId);
     }
 
     @Transactional

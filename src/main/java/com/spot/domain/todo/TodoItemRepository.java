@@ -42,4 +42,6 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
     );
 
     List<TodoItem> findByIdIn(Collection<Long> ids);
+
+    List<TodoItem> findByUserIdAndCategory_Id(Long userId, Long categoryId);
 }
