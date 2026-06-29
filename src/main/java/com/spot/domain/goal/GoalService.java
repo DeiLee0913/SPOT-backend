@@ -3,9 +3,13 @@ package com.spot.domain.goal;
 import com.spot.common.BadRequestException;
 import com.spot.common.ConflictException;
 import com.spot.common.StudyDayService;
+import com.spot.domain.session.SessionStatus;
+import com.spot.domain.session.StudySession;
+import com.spot.domain.session.StudySessionRepository;
 import com.spot.domain.user.User;
 import com.spot.domain.user.UserRepository;
 import com.spot.domain.user.UserStatus;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -20,15 +24,18 @@ public class GoalService {
     private final DailyGoalRepository dailyGoalRepository;
     private final UserRepository userRepository;
     private final StudyDayService studyDayService;
+    private final StudySessionRepository studySessionRepository;
 
     public GoalService(
         DailyGoalRepository dailyGoalRepository,
         UserRepository userRepository,
-        StudyDayService studyDayService
+        StudyDayService studyDayService,
+        StudySessionRepository studySessionRepository
     ) {
         this.dailyGoalRepository = dailyGoalRepository;
         this.userRepository = userRepository;
         this.studyDayService = studyDayService;
+        this.studySessionRepository = studySessionRepository;
     }
 
     /**
@@ -80,7 +87,7 @@ public class GoalService {
         }
         LocalDate today = studyDayService.currentStudyDay();
         if (studyDayService.isAfterGoalDeadline(today) && !needsTodayGoalSetup(userId)) {
-            throw new ConflictException("GOAL_DEADLINE_PASSED", "오전 11시 이후에는 오늘 목표를 변경할 수 없습니다.");
+            assertCanChangeGoalAfterDeadline(userId, today, goalMinutes);
         }
 
         return dailyGoalRepository.findByUserIdAndStudyDay(userId, today)
@@ -143,6 +150,39 @@ public class GoalService {
             created++;
         }
         return created;
+    }
+
+    /**
+     * 11:00 마감 이후 변경 허용 조건: 오늘 목표를 이미 달성했고, 새 목표가 현재 목표 이상일 때만.
+     */
+    private void assertCanChangeGoalAfterDeadline(Long userId, LocalDate today, int goalMinutes) {
+        int currentGoal = resolveCurrentGoalMinutes(userId, today);
+        if (goalMinutes < currentGoal) {
+            throw new ConflictException("GOAL_CANNOT_DECREASE", "오전 11시 이후에는 오늘 목표를 낮출 수 없습니다.");
+        }
+        int studiedMinutes = todayStudyMinutes(userId, today);
+        if (studiedMinutes < currentGoal) {
+            throw new ConflictException("GOAL_NOT_ACHIEVED", "오늘 목표를 달성한 후에만 목표를 늘릴 수 있습니다.");
+        }
+    }
+
+    private int resolveCurrentGoalMinutes(Long userId, LocalDate today) {
+        return dailyGoalRepository.findByUserIdAndStudyDay(userId, today)
+            .map(DailyGoal::getGoalMinutes)
+            .orElseGet(() -> getUser(userId).getDefaultGoalMinutes());
+    }
+
+    private int todayStudyMinutes(Long userId, LocalDate today) {
+        Instant now = studyDayService.now();
+        int total = 0;
+        for (StudySession session : studySessionRepository.findByUserIdAndStudyDay(userId, today)) {
+            if (session.getStatus() == SessionStatus.CLOSED) {
+                total += session.getDurationMinutes() != null ? session.getDurationMinutes() : 0;
+            } else if (session.getStatus() == SessionStatus.OPEN || session.getStatus() == SessionStatus.PAUSED) {
+                total += session.effectiveDurationSeconds(now) / 60;
+            }
+        }
+        return total;
     }
 
     private User getUser(Long userId) {
