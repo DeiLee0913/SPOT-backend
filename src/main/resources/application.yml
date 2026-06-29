@@ -16,6 +16,7 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+    repair-on-migrate: true
 
 server:
   port: ${PORT:${SERVER_PORT:8080}}
