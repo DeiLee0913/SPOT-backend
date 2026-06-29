@@ -141,7 +141,7 @@ class GoalIncreaseAfterDeadlineApiTest {
         Instant end = start.plusSeconds(durationMinutes * 60L);
         mockMvc.perform(asUser(post("/sessions/manual"), token)
                 .content(String.format(
-                    "{\"category\":\"Study\",\"startedAt\":\"%s\",\"endedAt\":\"%s\"}",
+                    "{\"title\":\"Study\",\"startedAt\":\"%s\",\"endedAt\":\"%s\"}",
                     start, end
                 )))
             .andExpect(status().isCreated());

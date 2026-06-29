@@ -35,8 +35,8 @@ public class StudySession {
     @Column(name = "study_day", nullable = false)
     private LocalDate studyDay;
 
-    @Column(nullable = false, length = 50)
-    private String category;
+    @Column(name = "todo_id")
+    private Long todoId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -73,7 +73,7 @@ public class StudySession {
     private StudySession(
         Long userId,
         LocalDate studyDay,
-        String category,
+        Long todoId,
         SessionSource source,
         SessionStatus status,
         Instant startedAt,
@@ -85,7 +85,7 @@ public class StudySession {
     ) {
         this.userId = userId;
         this.studyDay = studyDay;
-        this.category = category;
+        this.todoId = todoId;
         this.source = source;
         this.status = status;
         this.startedAt = startedAt;
@@ -96,11 +96,11 @@ public class StudySession {
         this.pausedAt = pausedAt;
     }
 
-    public static StudySession openTimer(Long userId, LocalDate studyDay, String category, Instant startedAt) {
+    public static StudySession openTimer(Long userId, LocalDate studyDay, Long todoId, Instant startedAt) {
         return new StudySession(
             userId,
             studyDay,
-            category,
+            todoId,
             SessionSource.TIMER,
             SessionStatus.OPEN,
             startedAt,
@@ -115,14 +115,14 @@ public class StudySession {
     public static StudySession manual(
         Long userId,
         LocalDate studyDay,
-        String category,
+        Long todoId,
         Instant startedAt,
         Instant endedAt
     ) {
         return new StudySession(
             userId,
             studyDay,
-            category,
+            todoId,
             SessionSource.MANUAL,
             SessionStatus.CLOSED,
             startedAt,
@@ -179,6 +179,10 @@ public class StudySession {
         this.pausedAt = null;
     }
 
+    public void linkTodo(Long todoId) {
+        this.todoId = todoId;
+    }
+
     public Instant activeEndInstant(Instant now) {
         return switch (status) {
             case CLOSED -> endedAt;
@@ -207,8 +211,8 @@ public class StudySession {
         return studyDay;
     }
 
-    public String getCategory() {
-        return category;
+    public Long getTodoId() {
+        return todoId;
     }
 
     public SessionSource getSource() {

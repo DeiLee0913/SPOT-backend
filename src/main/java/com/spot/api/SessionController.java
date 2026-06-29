@@ -3,6 +3,7 @@ package com.spot.api;
 import com.spot.api.dto.SessionDtos.ManualSessionRequest;
 import com.spot.api.dto.SessionDtos.SessionResponse;
 import com.spot.api.dto.SessionDtos.StartSessionRequest;
+import com.spot.api.dto.TodoDtos.LinkTodoRequest;
 import com.spot.auth.AuthenticatedUser;
 import com.spot.auth.CurrentUser;
 import com.spot.common.ApiResponse;
@@ -35,10 +36,12 @@ public class SessionController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<SessionResponse> start(
         @CurrentUser AuthenticatedUser currentUser,
-        @Valid @RequestBody StartSessionRequest request
+        @Valid @RequestBody(required = false) StartSessionRequest request
     ) {
-        StudySession session = sessionService.start(currentUser.userId(), request.category());
-        return ApiResponse.ok(SessionResponse.from(session));
+        Long todoId = request != null ? request.todoId() : null;
+        String title = request != null ? request.title() : null;
+        StudySession session = sessionService.start(currentUser.userId(), todoId, title);
+        return ApiResponse.ok(toResponse(session));
     }
 
     @PostMapping("/{sessionId}/end")
@@ -47,7 +50,7 @@ public class SessionController {
         @PathVariable Long sessionId
     ) {
         StudySession session = sessionService.end(currentUser.userId(), sessionId);
-        return ApiResponse.ok(SessionResponse.from(session));
+        return ApiResponse.ok(toResponse(session));
     }
 
     @PostMapping("/{sessionId}/pause")
@@ -56,7 +59,7 @@ public class SessionController {
         @PathVariable Long sessionId
     ) {
         StudySession session = sessionService.pause(currentUser.userId(), sessionId);
-        return ApiResponse.ok(SessionResponse.from(session));
+        return ApiResponse.ok(toResponse(session));
     }
 
     @PostMapping("/{sessionId}/resume")
@@ -65,7 +68,18 @@ public class SessionController {
         @PathVariable Long sessionId
     ) {
         StudySession session = sessionService.resume(currentUser.userId(), sessionId);
-        return ApiResponse.ok(SessionResponse.from(session));
+        return ApiResponse.ok(toResponse(session));
+    }
+
+    @PostMapping("/{sessionId}/link-todo")
+    public ApiResponse<SessionResponse> linkTodo(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long sessionId,
+        @RequestBody(required = false) LinkTodoRequest request
+    ) {
+        Long todoId = request != null ? request.todoId() : null;
+        StudySession session = sessionService.linkTodo(currentUser.userId(), sessionId, todoId);
+        return ApiResponse.ok(toResponse(session));
     }
 
     @PostMapping("/manual")
@@ -76,11 +90,11 @@ public class SessionController {
     ) {
         StudySession session = sessionService.registerManual(
             currentUser.userId(),
-            request.category(),
+            request.title(),
             request.startedAt(),
             request.endedAt()
         );
-        return ApiResponse.ok(SessionResponse.from(session));
+        return ApiResponse.ok(toResponse(session));
     }
 
     @DeleteMapping("/{sessionId}")
@@ -95,7 +109,7 @@ public class SessionController {
     @GetMapping("/today")
     public ApiResponse<List<SessionResponse>> today(@CurrentUser AuthenticatedUser currentUser) {
         List<SessionResponse> sessions = sessionService.today(currentUser.userId()).stream()
-            .map(SessionResponse::from)
+            .map(this::toResponse)
             .toList();
         return ApiResponse.ok(sessions);
     }
@@ -104,6 +118,10 @@ public class SessionController {
     public ApiResponse<SessionResponse> open(@CurrentUser AuthenticatedUser currentUser) {
         StudySession session = sessionService.findOpen(currentUser.userId())
             .orElseThrow(() -> new NotFoundException("NO_OPEN_SESSION", "진행 중인 세션이 없습니다."));
-        return ApiResponse.ok(SessionResponse.from(session));
+        return ApiResponse.ok(toResponse(session));
+    }
+
+    private SessionResponse toResponse(StudySession session) {
+        return SessionResponse.from(session, sessionService.resolveSessionTitle(session));
     }
 }

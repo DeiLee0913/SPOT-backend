@@ -60,7 +60,7 @@ class SessionPauseApiTest {
         String token = newUserToken();
 
         MvcResult started = mockMvc.perform(asUser(post("/sessions/start"), token)
-                .content("{\"category\":\"Spring\"}"))
+                .content("{\"title\":\"Spring\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.status", is("OPEN")))
             .andReturn();
@@ -85,7 +85,7 @@ class SessionPauseApiTest {
         String token = newUserToken();
 
         MvcResult started = mockMvc.perform(asUser(post("/sessions/start"), token)
-                .content("{\"category\":\"JPA\"}"))
+                .content("{\"title\":\"JPA\"}"))
             .andExpect(status().isCreated())
             .andReturn();
         long sessionId = dataNode(started).get("sessionId").asLong();

@@ -16,6 +16,8 @@ import com.spot.domain.group.MemberStatus;
 import com.spot.domain.session.SessionStatus;
 import com.spot.domain.session.StudySession;
 import com.spot.domain.session.StudySessionRepository;
+import com.spot.domain.todo.TodoItem;
+import com.spot.domain.todo.TodoItemRepository;
 import com.spot.domain.user.User;
 import com.spot.domain.user.UserRepository;
 import java.time.Instant;
@@ -24,6 +26,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +43,7 @@ public class DashboardService {
     private final UserRepository userRepository;
     private final DailyGoalRepository dailyGoalRepository;
     private final StudySessionRepository sessionRepository;
+    private final TodoItemRepository todoItemRepository;
     private final StudyDayService studyDayService;
 
     public DashboardService(
@@ -47,6 +52,7 @@ public class DashboardService {
         UserRepository userRepository,
         DailyGoalRepository dailyGoalRepository,
         StudySessionRepository sessionRepository,
+        TodoItemRepository todoItemRepository,
         StudyDayService studyDayService
     ) {
         this.memberRepository = memberRepository;
@@ -54,6 +60,7 @@ public class DashboardService {
         this.userRepository = userRepository;
         this.dailyGoalRepository = dailyGoalRepository;
         this.sessionRepository = sessionRepository;
+        this.todoItemRepository = todoItemRepository;
         this.studyDayService = studyDayService;
     }
 
@@ -151,10 +158,17 @@ public class DashboardService {
             volumeBonus += actual / 60 * STUDY_POINTS_PER_HOUR;
         }
 
-        List<DashboardSession> sessions = sessionRepository
-            .findByUserIdAndStatusAndStudyDay(user.getId(), SessionStatus.CLOSED, today).stream()
+        List<StudySession> closedToday = sessionRepository
+            .findByUserIdAndStatusAndStudyDay(user.getId(), SessionStatus.CLOSED, today);
+        var todoTitles = loadTodoTitles(closedToday);
+        List<DashboardSession> sessions = closedToday.stream()
             .map(s -> new DashboardSession(
-                s.getId(), s.getCategory(), s.getStartedAt(), s.getEndedAt(), s.getDurationMinutes()))
+                s.getId(),
+                s.getTodoId(),
+                s.getTodoId() != null ? todoTitles.get(s.getTodoId()) : null,
+                s.getStartedAt(),
+                s.getEndedAt(),
+                s.getDurationMinutes()))
             .toList();
 
         double rawRate = (todayGoal != null && todayGoal > 0) ? todayMinutes * 100.0 / todayGoal : 0.0;
@@ -215,6 +229,19 @@ public class DashboardService {
 
     private double round1(double value) {
         return Math.round(value * 10.0) / 10.0;
+    }
+
+    private Map<Long, String> loadTodoTitles(List<StudySession> sessions) {
+        List<Long> todoIds = sessions.stream()
+            .map(StudySession::getTodoId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        if (todoIds.isEmpty()) {
+            return Map.of();
+        }
+        return todoItemRepository.findByIdIn(todoIds).stream()
+            .collect(Collectors.toMap(TodoItem::getId, TodoItem::getTitle));
     }
 
     private static final class MemberAccumulator {

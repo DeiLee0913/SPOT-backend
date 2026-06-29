@@ -176,15 +176,17 @@ class CoreApiTest {
 
         // 타이머 시작
         MvcResult started = mockMvc.perform(asUser(post("/sessions/start"), user)
-                .content("{\"category\":\"Spring\"}"))
+                .content("{\"title\":\"Spring\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.status", is("OPEN")))
+            .andExpect(jsonPath("$.data.title", is("Spring")))
+            .andExpect(jsonPath("$.data.todoId").exists())
             .andReturn();
         long sessionId = dataNode(started).get("sessionId").asLong();
 
         // 이미 OPEN 세션 있는데 또 시작 → 409
         mockMvc.perform(asUser(post("/sessions/start"), user)
-                .content("{\"category\":\"JPA\"}"))
+                .content("{\"title\":\"JPA\"}"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.error.code", is("SESSION_ALREADY_OPEN")));
 
@@ -195,26 +197,26 @@ class CoreApiTest {
 
         // 수동 세션 등록 (과거, 겹치지 않음)
         mockMvc.perform(asUser(post("/sessions/manual"), user)
-                .content("{\"category\":\"알고리즘\",\"startedAt\":\"2026-06-26T22:00:00Z\",\"endedAt\":\"2026-06-26T23:00:00Z\"}"))
+                .content("{\"title\":\"알고리즘\",\"startedAt\":\"2026-06-26T22:00:00Z\",\"endedAt\":\"2026-06-26T23:00:00Z\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.durationMinutes", is(60)))
             .andExpect(jsonPath("$.data.source", is("MANUAL")));
 
         // 겹치는 수동 세션 → 409
         mockMvc.perform(asUser(post("/sessions/manual"), user)
-                .content("{\"category\":\"중복\",\"startedAt\":\"2026-06-26T22:30:00Z\",\"endedAt\":\"2026-06-26T23:30:00Z\"}"))
+                .content("{\"title\":\"중복\",\"startedAt\":\"2026-06-26T22:30:00Z\",\"endedAt\":\"2026-06-26T23:30:00Z\"}"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.error.code", is("SESSION_OVERLAP")));
 
         // 미래 종료 시각 → 400
         mockMvc.perform(asUser(post("/sessions/manual"), user)
-                .content("{\"category\":\"미래\",\"startedAt\":\"2026-06-27T05:00:00Z\",\"endedAt\":\"2026-06-27T06:00:00Z\"}"))
+                .content("{\"title\":\"미래\",\"startedAt\":\"2026-06-27T05:00:00Z\",\"endedAt\":\"2026-06-27T06:00:00Z\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code", is("FUTURE_TIME")));
 
         // 미래 시작 시각 → 400
         mockMvc.perform(asUser(post("/sessions/manual"), user)
-                .content("{\"category\":\"미래시작\",\"startedAt\":\"2026-06-27T01:00:00Z\",\"endedAt\":\"2026-06-27T01:30:00Z\"}"))
+                .content("{\"title\":\"미래시작\",\"startedAt\":\"2026-06-27T01:00:00Z\",\"endedAt\":\"2026-06-27T01:30:00Z\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code", is("FUTURE_TIME")));
 

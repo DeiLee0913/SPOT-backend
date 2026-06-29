@@ -85,11 +85,11 @@ class SchedulerTest {
         // 전일(2026-06-26) study day의 OPEN 세션
         Instant startedAt = Instant.parse("2026-06-26T01:00:00Z"); // 2026-06-26 10:00 KST
         StudySession stale = sessionRepository.save(
-            StudySession.openTimer(owner.getId(), LocalDate.of(2026, 6, 26), "밀린공부", startedAt));
+            StudySession.openTimer(owner.getId(), LocalDate.of(2026, 6, 26), null, startedAt));
 
         // 오늘(2026-06-27) study day의 OPEN 세션 — 유지되어야 함
         StudySession current = sessionRepository.save(
-            StudySession.openTimer(owner.getId(), TODAY, "오늘공부", Instant.parse("2026-06-26T22:00:00Z")));
+            StudySession.openTimer(owner.getId(), TODAY, null, Instant.parse("2026-06-26T22:00:00Z")));
 
         int closed = sessionService.closeCrossDaySessions();
         assertThat(closed).isEqualTo(1);

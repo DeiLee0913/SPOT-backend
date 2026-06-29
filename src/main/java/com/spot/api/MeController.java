@@ -83,7 +83,7 @@ public class MeController {
             .orElse(null);
 
         OpenSession openSession = sessionService.findOpen(userId)
-            .map(MeController::toOpenSession)
+            .map(this::toOpenSession)
             .orElse(null);
 
         return new MeResponse(
@@ -109,10 +109,11 @@ public class MeController {
         );
     }
 
-    private static OpenSession toOpenSession(StudySession session) {
+    private OpenSession toOpenSession(StudySession session) {
         return new OpenSession(
             session.getId(),
-            session.getCategory(),
+            session.getTodoId(),
+            sessionService.resolveSessionTitle(session),
             session.getStatus().name(),
             session.getStartedAt(),
             session.getActiveDurationSeconds(),
@@ -151,7 +152,8 @@ public class MeController {
 
     public record OpenSession(
         Long sessionId,
-        String category,
+        Long todoId,
+        String title,
         String status,
         Instant startedAt,
         int activeDurationSeconds,

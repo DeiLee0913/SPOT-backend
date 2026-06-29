@@ -39,7 +39,8 @@ public final class DashboardDtos {
 
     public record DashboardSession(
         Long sessionId,
-        String category,
+        Long todoId,
+        String title,
         Instant startedAt,
         Instant endedAt,
         Integer durationMinutes

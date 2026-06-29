@@ -5,6 +5,8 @@ import com.spot.common.ConflictException;
 import com.spot.common.ForbiddenException;
 import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
+import com.spot.domain.todo.TodoItem;
+import com.spot.domain.todo.TodoService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,26 +21,31 @@ import static com.spot.common.StudyDayService.RESET_HOUR;
 @Service
 public class SessionService {
 
-    private static final int MAX_CATEGORY_LENGTH = 50;
     private static final long MAX_DURATION_MINUTES = 2 * 60;
 
     private final StudySessionRepository sessionRepository;
     private final StudyDayService studyDayService;
+    private final TodoService todoService;
 
-    public SessionService(StudySessionRepository sessionRepository, StudyDayService studyDayService) {
+    public SessionService(
+        StudySessionRepository sessionRepository,
+        StudyDayService studyDayService,
+        TodoService todoService
+    ) {
         this.sessionRepository = sessionRepository;
         this.studyDayService = studyDayService;
+        this.todoService = todoService;
     }
 
     @Transactional
-    public StudySession start(Long userId, String rawCategory) {
-        String category = validateCategory(rawCategory);
+    public StudySession start(Long userId, Long todoId, String rawTitle) {
         findActive(userId).ifPresent(s -> {
             throw new ConflictException("SESSION_ALREADY_OPEN", "진행 중인 세션이 있습니다.");
         });
+        Long linkedTodoId = resolveTodoForStart(userId, todoId, rawTitle);
         Instant now = studyDayService.now();
         return sessionRepository.save(
-            StudySession.openTimer(userId, studyDayService.toStudyDay(now), category, now)
+            StudySession.openTimer(userId, studyDayService.toStudyDay(now), linkedTodoId, now)
         );
     }
 
@@ -76,13 +83,26 @@ public class SessionService {
     }
 
     @Transactional
-    public StudySession registerManual(Long userId, String rawCategory, Instant startedAt, Instant endedAt) {
-        String category = validateCategory(rawCategory);
+    public StudySession linkTodo(Long userId, Long sessionId, Long todoId) {
+        StudySession session = getOwnedSession(userId, sessionId);
+        if (todoId == null) {
+            session.linkTodo(null);
+            return session;
+        }
+        todoService.getOwned(userId, todoId);
+        session.linkTodo(todoId);
+        return session;
+    }
+
+    @Transactional
+    public StudySession registerManual(Long userId, String rawTitle, Instant startedAt, Instant endedAt) {
+        String title = validateTitle(rawTitle);
         validateRange(startedAt, endedAt);
         ensureNoOverlap(userId, startedAt, endedAt);
 
         LocalDate studyDay = studyDayService.toStudyDay(startedAt);
-        return sessionRepository.save(StudySession.manual(userId, studyDay, category, startedAt, endedAt));
+        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay);
+        return sessionRepository.save(StudySession.manual(userId, studyDay, todo.getId(), startedAt, endedAt));
     }
 
     @Transactional
@@ -118,7 +138,6 @@ public class SessionService {
         return sessionRepository.findByUserIdAndStudyDay(userId, studyDayService.currentStudyDay());
     }
 
-    /** OPEN 또는 PAUSED 타이머 세션 (진행 중) */
     @Transactional(readOnly = true)
     public Optional<StudySession> findOpen(Long userId) {
         return findActive(userId);
@@ -132,6 +151,25 @@ public class SessionService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public String resolveSessionTitle(StudySession session) {
+        if (session.getTodoId() == null) {
+            return null;
+        }
+        return todoService.resolveTitle(session.getTodoId());
+    }
+
+    private Long resolveTodoForStart(Long userId, Long todoId, String rawTitle) {
+        if (todoId != null) {
+            todoService.getOwned(userId, todoId);
+            return todoId;
+        }
+        if (StringUtils.hasText(rawTitle)) {
+            return todoService.quickCreate(userId, rawTitle).getId();
+        }
+        return null;
+    }
+
     private StudySession getOwnedSession(Long userId, Long sessionId) {
         StudySession session = sessionRepository.findById(sessionId)
             .orElseThrow(() -> new NotFoundException("SESSION_NOT_FOUND", "세션을 찾을 수 없습니다."));
@@ -141,15 +179,15 @@ public class SessionService {
         return session;
     }
 
-    private String validateCategory(String rawCategory) {
-        String category = rawCategory == null ? "" : rawCategory.trim();
-        if (!StringUtils.hasText(category)) {
-            throw new BadRequestException("CATEGORY_REQUIRED", "카테고리를 입력해주세요.");
+    private String validateTitle(String rawTitle) {
+        String title = rawTitle == null ? "" : rawTitle.trim();
+        if (!StringUtils.hasText(title)) {
+            throw new BadRequestException("TITLE_REQUIRED", "할 일 제목을 입력해주세요.");
         }
-        if (category.length() > MAX_CATEGORY_LENGTH) {
-            throw new BadRequestException("CATEGORY_TOO_LONG", "카테고리는 50자 이하여야 합니다.");
+        if (title.length() > TodoService.MAX_TITLE_LENGTH) {
+            throw new BadRequestException("TITLE_TOO_LONG", "제목은 200자 이하여야 합니다.");
         }
-        return category;
+        return title;
     }
 
     private void validateRange(Instant startedAt, Instant endedAt) {

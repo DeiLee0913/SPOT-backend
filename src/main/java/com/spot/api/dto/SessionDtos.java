@@ -12,12 +12,13 @@ public final class SessionDtos {
     }
 
     public record StartSessionRequest(
-        @NotBlank(message = "카테고리를 입력해주세요.") String category
+        Long todoId,
+        String title
     ) {
     }
 
     public record ManualSessionRequest(
-        @NotBlank(message = "카테고리를 입력해주세요.") String category,
+        @NotBlank(message = "할 일 제목을 입력해주세요.") String title,
         @NotNull(message = "시작 시각을 입력해주세요.") Instant startedAt,
         @NotNull(message = "종료 시각을 입력해주세요.") Instant endedAt
     ) {
@@ -25,7 +26,8 @@ public final class SessionDtos {
 
     public record SessionResponse(
         Long sessionId,
-        String category,
+        Long todoId,
+        String title,
         String source,
         String status,
         Instant startedAt,
@@ -35,10 +37,11 @@ public final class SessionDtos {
         Integer activeDurationSeconds,
         Instant lastResumedAt
     ) {
-        public static SessionResponse from(StudySession session) {
+        public static SessionResponse from(StudySession session, String title) {
             return new SessionResponse(
                 session.getId(),
-                session.getCategory(),
+                session.getTodoId(),
+                title,
                 session.getSource().name(),
                 session.getStatus().name(),
                 session.getStartedAt(),

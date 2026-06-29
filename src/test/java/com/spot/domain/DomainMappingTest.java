@@ -13,6 +13,8 @@ import com.spot.domain.group.StudyGroupRepository;
 import com.spot.domain.session.SessionStatus;
 import com.spot.domain.session.StudySession;
 import com.spot.domain.session.StudySessionRepository;
+import com.spot.domain.todo.TodoItem;
+import com.spot.domain.todo.TodoItemRepository;
 import com.spot.domain.user.AuthProvider;
 import com.spot.domain.user.User;
 import com.spot.domain.user.UserRepository;
@@ -41,6 +43,9 @@ class DomainMappingTest {
 
     @Autowired
     private StudySessionRepository studySessionRepository;
+
+    @Autowired
+    private TodoItemRepository todoItemRepository;
 
     @Test
     void persistsUserAndFindsByProvider() {
@@ -82,8 +87,9 @@ class DomainMappingTest {
         LocalDate studyDay = LocalDate.of(2026, 6, 27);
         Instant startedAt = Instant.parse("2026-06-27T05:30:00Z");
 
+        TodoItem todo = todoItemRepository.save(new TodoItem(user.getId(), "Spring Boot", studyDay));
         StudySession session = studySessionRepository.save(
-            StudySession.openTimer(user.getId(), studyDay, "Spring Boot", startedAt)
+            StudySession.openTimer(user.getId(), studyDay, todo.getId(), startedAt)
         );
         assertThat(studySessionRepository.findByUserIdAndStatus(user.getId(), SessionStatus.OPEN)).isPresent();
 
@@ -99,10 +105,11 @@ class DomainMappingTest {
     void persistsManualSessionWithComputedDuration() {
         User user = userRepository.save(User.ofSocial(AuthProvider.NAVER, "naver-5", null, "하준", 100));
         LocalDate studyDay = LocalDate.of(2026, 6, 27);
+        TodoItem todo = todoItemRepository.save(new TodoItem(user.getId(), "영어", studyDay));
         StudySession manual = StudySession.manual(
             user.getId(),
             studyDay,
-            "영어",
+            todo.getId(),
             Instant.parse("2026-06-27T00:00:00Z"),
             Instant.parse("2026-06-27T02:30:00Z")
         );

@@ -17,8 +17,9 @@
 
 - **인증**: 네이버 OAuth 로그인 후 JWT 발급
 - **그룹**: 1인 1그룹, 초대 코드 + 생성자 승인 가입, 최대 20명
-- **목표**: 일일 학습 목표 설정, 개인 기본(DEFAULT) 목표, **오전 11시(KST)** 설정 마감
-- **타이머 세션**: 카테고리별 시작/종료, 하루 다중 세션 누적, "이어서 공부하기" 복구
+- **목표**: 일일 학습 목표, 11:00 마감, 가입 첫날·**달성 후 상향** 예외
+- **타이머 세션**: todo 연동 시작/종료/**일시정지·재개**, effective duration, 이어하기
+- **할 일(Todo)**: 개인 todo 목록, 카테고리·태그·우선순위, 타이머 picker / quick-create
 - **수동 세션**: 타이머 누락 시 시작·종료 시각 직접 입력 (시간 겹침 검증)
 - **세션 정책**: 등록된 세션은 수정 불가, 삭제만 가능 (타이머/수동 공통)
 - **그룹 대시보드**: 그룹원별 오늘 누적 시간·달성률, 주간 점수/순위, 최근 7일 히스토리
@@ -46,7 +47,10 @@
 | GET | `/me` | O | 내 정보 + 그룹 소속 + 진행 중 세션 |
 | PUT | `/me/default-goal` | O | 기본 목표 시간 변경 |
 | GET/PUT | `/goals/today` | O | 오늘 목표 조회/설정 |
-| POST | `/sessions/start` | O | 타이머 세션 시작 |
+| POST | `/sessions/start` | O | 타이머 세션 시작 (`todoId` 또는 `title`, 둘 다 생략 가능) |
+| POST | `/sessions/{id}/link-todo` | O | 진행 중 세션에 todo 연결 |
+| POST | `/sessions/{id}/pause` | O | 타이머 일시정지 |
+| POST | `/sessions/{id}/resume` | O | 타이머 재개 |
 | POST | `/sessions/{id}/end` | O | 타이머 세션 종료 |
 | POST | `/sessions/manual` | O | 수동 세션 등록 |
 | DELETE | `/sessions/{id}` | O | 세션 삭제 |
@@ -56,6 +60,12 @@
 | POST | `/groups/me/leave` | O | 그룹 탈퇴(생성자는 승인권 이전) |
 | GET/POST | `/groups/me/join-requests/...` | O | 가입 요청 목록 / 승인 / 거절 |
 | GET | `/groups/me/dashboard` | O | 그룹 대시보드 |
+| GET | `/todos` | O | study day별 todo 섹션 (today/undated/outdated/done) |
+| GET | `/todos/picker` | O | 타이머용 오늘 todo 목록 |
+| POST | `/todos/quick` | O | 제목만으로 오늘 todo 빠른 생성 |
+| POST/PATCH | `/todos`, `/todos/{id}` | O | todo 생성 / 수정 |
+| POST | `/todos/{id}/complete`, `/reopen`, `/reschedule-today` | O | 완료 / 재오픈 / 오늘로 재배치 |
+| GET/POST | `/todos/categories`, `/todos/tags` | O | 카테고리·태그 관리 |
 
 인증이 필요한 API는 `Authorization: Bearer <JWT>` 헤더가 필요합니다.
 
@@ -112,6 +122,8 @@ FLUSH PRIVILEGES;
 `AIVEN_DB_HOST`, `AIVEN_DB_PORT` (17030), `AIVEN_DB_USERNAME` (avnadmin), `AIVEN_DB_PASSWORD`, `AIVEN_DB_NAME` (defaultdb)
 
 Actions 탭에서 `Aiven DB keepalive` → **Run workflow** 로 즉시 테스트 가능.
+
+> 상세: 로컬 `docs/KEEPALIVE.md` (gitignore)
 
 ## 프로젝트 구조
 

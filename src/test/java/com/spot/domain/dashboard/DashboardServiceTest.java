@@ -140,7 +140,7 @@ class DashboardServiceTest {
         return StudySession.manual(
             userId,
             studyDay,
-            "Study",
+            null,
             Instant.parse(start),
             Instant.parse(end)
         );
