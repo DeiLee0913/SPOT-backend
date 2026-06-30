@@ -25,6 +25,13 @@ class CorsConfigTest {
     }
 
     @Test
+    void preflightAllows127Origin() throws Exception {
+        mockMvc.perform(options("/health").header("Origin", "http://127.0.0.1:5173"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:5173"));
+    }
+
+    @Test
     void preflightAllowsPatchMethod() throws Exception {
         mockMvc.perform(options("/todos/1")
                 .header("Origin", "http://localhost:5173")

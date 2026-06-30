@@ -215,8 +215,7 @@ public class TodoService {
     @Transactional
     public void deleteCategory(Long userId, Long categoryId) {
         getOwnedCategory(userId, categoryId);
-        todoItemRepository.findByUserIdAndCategory_Id(userId, categoryId)
-            .forEach(item -> item.assignCategory(null));
+        todoItemRepository.clearCategory(userId, categoryId);
         categoryRepository.deleteById(categoryId);
     }
 
@@ -338,7 +337,11 @@ public class TodoService {
         if (!StringUtils.hasText(color)) {
             return DEFAULT_CATEGORY_COLOR;
         }
-        return color.trim();
+        String trimmed = color.trim();
+        if (trimmed.length() > 7) {
+            throw new BadRequestException("INVALID_COLOR", "색상 코드 형식이 올바르지 않습니다.");
+        }
+        return trimmed;
     }
 
     public record TodoDayView(

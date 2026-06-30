@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -44,6 +45,14 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
     List<TodoItem> findByIdIn(Collection<Long> ids);
 
     List<TodoItem> findByUserIdAndCategory_Id(Long userId, Long categoryId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update TodoItem t
+        set t.category = null
+        where t.userId = :userId and t.category.id = :categoryId
+        """)
+    void clearCategory(@Param("userId") Long userId, @Param("categoryId") Long categoryId);
 
     @Query("""
         select distinct t from TodoItem t join t.tags tag
