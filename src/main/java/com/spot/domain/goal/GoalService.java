@@ -2,6 +2,7 @@ package com.spot.domain.goal;
 
 import com.spot.common.BadRequestException;
 import com.spot.common.ConflictException;
+import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
 import com.spot.domain.session.SessionStatus;
 import com.spot.domain.session.StudySession;
@@ -187,7 +188,7 @@ public class GoalService {
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalStateException("사용자를 찾을 수 없습니다: " + userId));
+            .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
     }
 
     public record TodayGoalView(LocalDate studyDay, Integer goalMinutes, GoalSource source, boolean deadlineApplied) {

@@ -1,6 +1,7 @@
 package com.spot.domain.user;
 
 import com.spot.common.BadRequestException;
+import com.spot.common.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,7 +36,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public User getById(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalStateException("사용자를 찾을 수 없습니다: " + userId));
+            .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
     }
 
     @Transactional

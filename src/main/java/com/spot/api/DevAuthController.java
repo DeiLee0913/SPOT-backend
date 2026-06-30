@@ -2,9 +2,11 @@ package com.spot.api;
 
 import com.spot.auth.jwt.JwtService;
 import com.spot.common.ApiResponse;
+import com.spot.common.UnauthorizedException;
 import com.spot.domain.user.AuthProvider;
 import com.spot.domain.user.User;
 import com.spot.domain.user.UserService;
+import com.spot.domain.user.UserStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.util.StringUtils;
@@ -51,6 +53,9 @@ public class DevAuthController {
             naverNickname,
             defaultGoalMinutes
         );
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new UnauthorizedException("계정을 사용할 수 없습니다.");
+        }
         String token = jwtService.generateToken(user.getId());
         return ApiResponse.ok(new TokenResponse(
             token,

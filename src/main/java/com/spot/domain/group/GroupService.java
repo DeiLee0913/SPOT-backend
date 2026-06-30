@@ -71,10 +71,10 @@ public class GroupService {
     @Transactional(readOnly = true)
     public List<MyGroup> listMyGroups(Long userId) {
         return memberRepository.findByUserIdAndStatusIn(userId, VISIBLE_MEMBERSHIPS).stream()
-            .map(membership -> {
-                StudyGroup group = getGroup(membership.getGroupId());
-                return toMyGroup(group, membership, group.isCreator(userId));
-            })
+            .map(membership -> groupRepository.findById(membership.getGroupId())
+                .filter(group -> group.getStatus() == GroupStatus.ACTIVE)
+                .map(group -> toMyGroup(group, membership, group.isCreator(userId))))
+            .flatMap(Optional::stream)
             .toList();
     }
 
