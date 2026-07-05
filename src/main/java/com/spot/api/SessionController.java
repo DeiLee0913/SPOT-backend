@@ -8,10 +8,13 @@ import com.spot.auth.AuthenticatedUser;
 import com.spot.auth.CurrentUser;
 import com.spot.common.ApiResponse;
 import com.spot.common.NotFoundException;
+import com.spot.common.StudyDayService;
 import com.spot.domain.session.SessionService;
 import com.spot.domain.session.StudySession;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,9 +31,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionController {
 
     private final SessionService sessionService;
+    private final StudyDayService studyDayService;
 
-    public SessionController(SessionService sessionService) {
+    public SessionController(SessionService sessionService, StudyDayService studyDayService) {
         this.sessionService = sessionService;
+        this.studyDayService = studyDayService;
     }
 
     @PostMapping("/start")
@@ -106,12 +112,21 @@ public class SessionController {
         return ApiResponse.ok(null);
     }
 
-    @GetMapping("/today")
-    public ApiResponse<List<SessionResponse>> today(@CurrentUser AuthenticatedUser currentUser) {
-        List<SessionResponse> sessions = sessionService.today(currentUser.userId()).stream()
+    @GetMapping
+    public ApiResponse<List<SessionResponse>> list(
+        @CurrentUser AuthenticatedUser currentUser,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate studyDay
+    ) {
+        LocalDate day = studyDay != null ? studyDay : studyDayService.currentStudyDay();
+        List<SessionResponse> sessions = sessionService.listForStudyDay(currentUser.userId(), day).stream()
             .map(this::toResponse)
             .toList();
         return ApiResponse.ok(sessions);
+    }
+
+    @GetMapping("/today")
+    public ApiResponse<List<SessionResponse>> today(@CurrentUser AuthenticatedUser currentUser) {
+        return list(currentUser, null);
     }
 
     @GetMapping("/open")

@@ -128,6 +128,35 @@ class DashboardServiceTest {
         assertThat(monday.goalMinutes()).isNull();
     }
 
+    @Test
+    @Transactional
+    void studyDaySelectsMondayThroughRequestedEndOfWeek() throws Exception {
+        User user = userRepository.save(User.ofSocial(AuthProvider.NAVER, "week-user", null, "Week", 60));
+        StudyGroup group = groupRepository.save(new StudyGroup("Week Group", "WEEK01", user.getId()));
+        GroupMember membership = memberRepository.save(GroupMember.active(group.getId(), user.getId()));
+        setJoinedAt(membership, Instant.parse("2026-06-15T21:00:00Z"));
+
+        LocalDate priorFriday = LocalDate.of(2026, 6, 19);
+        dailyGoalRepository.save(new DailyGoal(user.getId(), priorFriday, 120, GoalSource.USER_SET));
+        sessionRepository.save(closedManual(user.getId(), priorFriday,
+            "2026-06-19T01:00:00Z", "2026-06-19T03:00:00Z", 120));
+
+        var member = dashboardService.getDashboard(user.getId(), group.getId(), priorFriday).members().getFirst();
+
+        assertThat(member.weeklyScoreRange().from()).isEqualTo(LocalDate.of(2026, 6, 15));
+        assertThat(member.weeklyScoreRange().to()).isEqualTo(priorFriday);
+        assertThat(member.history()).hasSize(5); // Mon 6/15 .. Fri 6/19
+
+        var friday = member.history().stream()
+            .filter(day -> day.studyDay().equals(priorFriday))
+            .findFirst()
+            .orElseThrow();
+        assertThat(friday.goalMinutes()).isEqualTo(120);
+        assertThat(friday.actualMinutes()).isEqualTo(120);
+        assertThat(member.weeklyScoreBreakdown().achievementPoints()).isEqualTo(3);
+        assertThat(member.weeklyScoreBreakdown().volumeBonus()).isEqualTo(2);
+    }
+
     private static void setJoinedAt(GroupMember membership, Instant joinedAt) throws Exception {
         Field field = GroupMember.class.getDeclaredField("joinedAt");
         field.setAccessible(true);

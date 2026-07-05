@@ -4,6 +4,7 @@ import com.spot.domain.goal.GoalService.TodayGoalView;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
+import java.util.List;
 
 public final class GoalDtos {
 
@@ -31,5 +32,26 @@ public final class GoalDtos {
                 view.deadlineApplied()
             );
         }
+    }
+
+    public record GoalDayResponse(
+        LocalDate studyDay,
+        int goalMinutes,
+        String source
+    ) {
+        public static GoalDayResponse from(com.spot.domain.goal.DailyGoal goal) {
+            return new GoalDayResponse(
+                goal.getStudyDay(),
+                goal.getGoalMinutes(),
+                goal.getSource().name()
+            );
+        }
+    }
+
+    public record GoalRangeResponse(
+        LocalDate from,
+        LocalDate to,
+        List<GoalDayResponse> goals
+    ) {
     }
 }

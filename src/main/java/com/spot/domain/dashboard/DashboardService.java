@@ -34,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DashboardService {
 
-    private static final int HISTORY_DAYS = 7;
     private static final int GOAL_ACHIEVED_POINTS_PER_DAY = 3;
     private static final int STUDY_POINTS_PER_HOUR = 1;
 
@@ -66,11 +65,17 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard(Long userId, Long groupId) {
+        return getDashboard(userId, groupId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboard(Long userId, Long groupId, LocalDate requestedStudyDay) {
         groupService.requireActiveMembership(userId, groupId);
 
         LocalDate today = studyDayService.currentStudyDay();
-        LocalDate historyStart = today.minusDays(HISTORY_DAYS - 1L);
-        LocalDate weekStart = studyDayService.weekMonday(today);
+        LocalDate rawViewEnd = requestedStudyDay != null ? requestedStudyDay : today;
+        final LocalDate viewEnd = rawViewEnd.isAfter(today) ? today : rawViewEnd;
+        LocalDate viewStart = studyDayService.weekMonday(viewEnd);
         boolean afterDeadlineToday = studyDayService.isAfterGoalDeadline(today);
 
         List<GroupMember> activeMembers = memberRepository.findByGroupIdAndStatus(
@@ -83,13 +88,13 @@ public class DashboardService {
                 continue;
             }
             accumulators.add(buildAccumulator(
-                member, user, today, historyStart, weekStart, afterDeadlineToday));
+                member, user, today, viewStart, viewEnd, afterDeadlineToday));
         }
 
         assignRanks(accumulators);
 
         List<MemberDashboard> members = accumulators.stream()
-            .map(acc -> acc.toDashboard(weekStart, today))
+            .map(acc -> acc.toDashboard(viewStart, viewEnd))
             .toList();
         return new DashboardResponse(today, members);
     }
@@ -98,8 +103,8 @@ public class DashboardService {
         GroupMember membership,
         User user,
         LocalDate today,
-        LocalDate historyStart,
-        LocalDate weekStart,
+        LocalDate viewStart,
+        LocalDate viewEnd,
         boolean afterDeadlineToday
     ) {
         LocalDate joinedStudyDay = resolveJoinedStudyDay(membership, today);
@@ -107,7 +112,7 @@ public class DashboardService {
 
         Map<LocalDate, Integer> minutesByDay = new HashMap<>();
         for (StudySession session : sessionRepository.findByUserIdAndStatusAndStudyDayBetween(
-            user.getId(), SessionStatus.CLOSED, historyStart, today)) {
+            user.getId(), SessionStatus.CLOSED, viewStart, viewEnd)) {
             minutesByDay.merge(
                 session.getStudyDay(),
                 session.getDurationMinutes() == null ? 0 : session.getDurationMinutes(),
@@ -117,7 +122,7 @@ public class DashboardService {
 
         Map<LocalDate, Integer> goalByDay = new HashMap<>();
         for (DailyGoal goal : dailyGoalRepository.findByUserIdAndStudyDayBetween(
-            user.getId(), historyStart, today)) {
+            user.getId(), viewStart, viewEnd)) {
             goalByDay.put(goal.getStudyDay(), goal.getGoalMinutes());
         }
 
@@ -131,8 +136,7 @@ public class DashboardService {
         Integer todayGoal = effectiveGoal(today, goalByDay, today, afterDeadlineToday, defaultGoal);
 
         List<HistoryDay> history = new ArrayList<>();
-        for (int i = 0; i < HISTORY_DAYS; i++) {
-            LocalDate day = historyStart.plusDays(i);
+        for (LocalDate day = viewStart; !day.isAfter(viewEnd); day = day.plusDays(1)) {
             if (day.isBefore(joinedStudyDay)) {
                 history.add(new HistoryDay(day, 0, null));
                 continue;
@@ -146,7 +150,7 @@ public class DashboardService {
 
         long achievementPoints = 0;
         long volumeBonus = 0;
-        for (LocalDate day = weekStart; !day.isAfter(today); day = day.plusDays(1)) {
+        for (LocalDate day = viewStart; !day.isAfter(viewEnd); day = day.plusDays(1)) {
             if (day.isBefore(joinedStudyDay)) {
                 continue;
             }
@@ -258,7 +262,7 @@ public class DashboardService {
         private List<HistoryDay> history;
         private List<DashboardSession> sessions;
 
-        private MemberDashboard toDashboard(LocalDate weekStart, LocalDate today) {
+        private MemberDashboard toDashboard(LocalDate viewStart, LocalDate viewEnd) {
             return new MemberDashboard(
                 userId,
                 nickname,
@@ -269,7 +273,7 @@ public class DashboardService {
                 weeklyScore,
                 weeklyRank,
                 new ScoreBreakdown(achievementPoints, volumeBonus),
-                new ScoreRange(weekStart, today),
+                new ScoreRange(viewStart, viewEnd),
                 history,
                 sessions
             );

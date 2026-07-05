@@ -225,6 +225,25 @@ class CoreApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(2)));
 
+        // study day별 세션 목록 — 과거 날짜
+        mockMvc.perform(asUser(post("/sessions/manual"), user)
+                .content("{\"title\":\"과거\",\"startedAt\":\"2026-06-25T15:00:00Z\",\"endedAt\":\"2026-06-25T16:00:00Z\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.studyDay", is("2026-06-25")));
+
+        mockMvc.perform(asUser(get("/sessions").param("studyDay", "2026-06-25"), user))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(1)))
+            .andExpect(jsonPath("$.data[0].title", is("과거")));
+
+        mockMvc.perform(asUser(get("/sessions").param("studyDay", "2026-06-26"), user))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(0)));
+
+        mockMvc.perform(asUser(get("/sessions"), user))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(2)));
+
         // 타이머 세션도 삭제 가능 (수정은 불가)
         mockMvc.perform(asUser(delete("/sessions/" + sessionId), user))
             .andExpect(status().isOk());

@@ -154,8 +154,9 @@ public class GroupService {
     }
 
     @Transactional
-    public GroupMember approve(Long creatorUserId, Long memberId) {
+    public GroupMember approve(Long creatorUserId, Long memberId, Long groupId) {
         GroupMember member = getMember(memberId);
+        assertMemberInGroup(member, groupId);
         creatorGroup(creatorUserId, member.getGroupId());
         if (member.getStatus() != MemberStatus.PENDING) {
             throw new ConflictException("NOT_PENDING", "승인 대기 상태가 아닙니다.");
@@ -170,8 +171,9 @@ public class GroupService {
     }
 
     @Transactional
-    public GroupMember reject(Long creatorUserId, Long memberId) {
+    public GroupMember reject(Long creatorUserId, Long memberId, Long groupId) {
         GroupMember member = getMember(memberId);
+        assertMemberInGroup(member, groupId);
         creatorGroup(creatorUserId, member.getGroupId());
         if (member.getStatus() != MemberStatus.PENDING) {
             throw new ConflictException("NOT_PENDING", "승인 대기 상태가 아닙니다.");
@@ -220,6 +222,12 @@ public class GroupService {
     private GroupMember getMember(Long memberId) {
         return memberRepository.findById(memberId)
             .orElseThrow(() -> new NotFoundException("MEMBER_NOT_FOUND", "가입 요청을 찾을 수 없습니다."));
+    }
+
+    private void assertMemberInGroup(GroupMember member, Long groupId) {
+        if (groupId != null && !member.getGroupId().equals(groupId)) {
+            throw new NotFoundException("MEMBER_NOT_FOUND", "가입 요청을 찾을 수 없습니다.");
+        }
     }
 
     private StudyGroup getGroup(Long groupId) {

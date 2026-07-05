@@ -49,18 +49,20 @@ public class JoinRequestController {
     @PostMapping("/{memberId}/approve")
     public ApiResponse<JoinRequestResponse> approve(
         @CurrentUser AuthenticatedUser currentUser,
-        @PathVariable Long memberId
+        @PathVariable Long memberId,
+        @RequestParam(required = false) Long groupId
     ) {
-        GroupMember member = groupService.approve(currentUser.userId(), memberId);
+        GroupMember member = groupService.approve(currentUser.userId(), memberId, groupId);
         return ApiResponse.ok(toResponse(member.getGroupId(), member));
     }
 
     @PostMapping("/{memberId}/reject")
     public ApiResponse<JoinRequestResponse> reject(
         @CurrentUser AuthenticatedUser currentUser,
-        @PathVariable Long memberId
+        @PathVariable Long memberId,
+        @RequestParam(required = false) Long groupId
     ) {
-        GroupMember member = groupService.reject(currentUser.userId(), memberId);
+        GroupMember member = groupService.reject(currentUser.userId(), memberId, groupId);
         return ApiResponse.ok(toResponse(member.getGroupId(), member));
     }
 

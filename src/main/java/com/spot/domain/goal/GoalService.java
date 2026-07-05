@@ -12,6 +12,7 @@ import com.spot.domain.user.UserRepository;
 import com.spot.domain.user.UserStatus;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -83,21 +84,49 @@ public class GoalService {
 
     @Transactional
     public DailyGoal setToday(Long userId, int goalMinutes) {
+        return setForStudyDay(userId, studyDayService.currentStudyDay(), goalMinutes);
+    }
+
+    /**
+     * study day별 목표 저장. 오늘은 마감(11:00) 규칙을 따르고, 미래는 USER_SET으로 저장한다.
+     */
+    @Transactional
+    public DailyGoal setForStudyDay(Long userId, LocalDate studyDay, int goalMinutes) {
         if (goalMinutes < 0) {
             throw new BadRequestException("INVALID_GOAL", "목표 시간은 0분 이상이어야 합니다.");
         }
         LocalDate today = studyDayService.currentStudyDay();
-        if (studyDayService.isAfterGoalDeadline(today) && !needsTodayGoalSetup(userId)) {
-            assertCanChangeGoalAfterDeadline(userId, today, goalMinutes);
+        if (studyDay.isBefore(today)) {
+            throw new BadRequestException("GOAL_PAST_LOCKED", "과거 날짜의 목표는 변경할 수 없습니다.");
         }
+        if (studyDay.isEqual(today)) {
+            if (studyDayService.isAfterGoalDeadline(today) && !needsTodayGoalSetup(userId)) {
+                assertCanChangeGoalAfterDeadline(userId, today, goalMinutes);
+            }
+            return upsertUserGoal(userId, studyDay, goalMinutes);
+        }
+        return upsertUserGoal(userId, studyDay, goalMinutes);
+    }
 
-        return dailyGoalRepository.findByUserIdAndStudyDay(userId, today)
+    @Transactional(readOnly = true)
+    public List<DailyGoal> getRange(Long userId, LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "시작일은 종료일 이전이어야 합니다.");
+        }
+        if (ChronoUnit.DAYS.between(from, to) > 60) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "조회 기간은 최대 60일입니다.");
+        }
+        return dailyGoalRepository.findByUserIdAndStudyDayBetween(userId, from, to);
+    }
+
+    private DailyGoal upsertUserGoal(Long userId, LocalDate studyDay, int goalMinutes) {
+        return dailyGoalRepository.findByUserIdAndStudyDay(userId, studyDay)
             .map(goal -> {
                 goal.changeGoal(goalMinutes, GoalSource.USER_SET);
                 return goal;
             })
             .orElseGet(() -> dailyGoalRepository.save(
-                new DailyGoal(userId, today, goalMinutes, GoalSource.USER_SET)
+                new DailyGoal(userId, studyDay, goalMinutes, GoalSource.USER_SET)
             ));
     }
 

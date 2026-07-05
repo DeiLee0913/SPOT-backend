@@ -10,6 +10,7 @@ import com.spot.domain.todo.TodoService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -135,7 +136,14 @@ public class SessionService {
 
     @Transactional(readOnly = true)
     public List<StudySession> today(Long userId) {
-        return sessionRepository.findByUserIdAndStudyDay(userId, studyDayService.currentStudyDay());
+        return listForStudyDay(userId, studyDayService.currentStudyDay());
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudySession> listForStudyDay(Long userId, LocalDate studyDay) {
+        return sessionRepository.findByUserIdAndStudyDay(userId, studyDay).stream()
+            .sorted(Comparator.comparing(StudySession::getStartedAt))
+            .toList();
     }
 
     @Transactional(readOnly = true)
