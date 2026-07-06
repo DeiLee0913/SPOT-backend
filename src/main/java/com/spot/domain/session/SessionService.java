@@ -96,14 +96,19 @@ public class SessionService {
     }
 
     @Transactional
-    public StudySession registerManual(Long userId, String rawTitle, Instant startedAt, Instant endedAt) {
-        String title = validateTitle(rawTitle);
+    public StudySession registerManual(
+        Long userId,
+        Long todoId,
+        String rawTitle,
+        Instant startedAt,
+        Instant endedAt
+    ) {
         validateRange(startedAt, endedAt);
         ensureNoOverlap(userId, startedAt, endedAt);
 
         LocalDate studyDay = studyDayService.toStudyDay(startedAt);
-        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay, null, null);
-        return sessionRepository.save(StudySession.manual(userId, studyDay, todo.getId(), startedAt, endedAt));
+        Long linkedTodoId = resolveTodoForManual(userId, todoId, rawTitle, studyDay);
+        return sessionRepository.save(StudySession.manual(userId, studyDay, linkedTodoId, startedAt, endedAt));
     }
 
     @Transactional
@@ -176,6 +181,16 @@ public class SessionService {
             return todoService.quickCreate(userId, rawTitle).getId();
         }
         return null;
+    }
+
+    private Long resolveTodoForManual(Long userId, Long todoId, String rawTitle, LocalDate studyDay) {
+        if (todoId != null) {
+            todoService.getOwned(userId, todoId);
+            return todoId;
+        }
+        String title = validateTitle(rawTitle);
+        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay, null, null);
+        return todo.getId();
     }
 
     private StudySession getOwnedSession(Long userId, Long sessionId) {

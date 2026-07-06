@@ -96,6 +96,7 @@ public class SessionController {
     ) {
         StudySession session = sessionService.registerManual(
             currentUser.userId(),
+            request.todoId(),
             request.title(),
             request.startedAt(),
             request.endedAt()

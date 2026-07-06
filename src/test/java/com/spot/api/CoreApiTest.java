@@ -249,6 +249,47 @@ class CoreApiTest {
             .andExpect(status().isOk());
     }
 
+    @Test
+    void manualSessionLinksExistingTodoWithoutDuplicate() throws Exception {
+        String user = newUserToken("수동");
+
+        MvcResult todo = mockMvc.perform(asUser(post("/todos"), user)
+                .content("{\"title\":\"Existing task\",\"dueStudyDay\":\"2026-06-26\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long todoId = dataNode(todo).get("todoId").asLong();
+
+        mockMvc.perform(asUser(get("/todos/picker"), user))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(1)));
+
+        mockMvc.perform(asUser(post("/sessions/manual"), user)
+                .content("""
+                    {
+                      "todoId": %d,
+                      "startedAt": "2026-06-26T20:00:00Z",
+                      "endedAt": "2026-06-26T21:00:00Z"
+                    }
+                    """.formatted(todoId)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.todoId", is((int) todoId)))
+            .andExpect(jsonPath("$.data.title", is("Existing task")));
+
+        mockMvc.perform(asUser(get("/todos/picker"), user))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(1)));
+
+        mockMvc.perform(asUser(post("/sessions/manual"), user)
+                .content("""
+                    {
+                      "startedAt": "2026-06-26T18:00:00Z",
+                      "endedAt": "2026-06-26T19:00:00Z"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code", is("TITLE_REQUIRED")));
+    }
+
     private String newUserToken(String nickname) {
         String providerId = "user-" + SEQ.incrementAndGet();
         User user = userRepository.save(User.ofSocial(AuthProvider.NAVER, providerId, null, nickname, 60));

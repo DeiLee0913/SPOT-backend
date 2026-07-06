@@ -1,7 +1,6 @@
 package com.spot.api.dto;
 
 import com.spot.domain.session.StudySession;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,7 +17,8 @@ public final class SessionDtos {
     }
 
     public record ManualSessionRequest(
-        @NotBlank(message = "할 일 제목을 입력해주세요.") String title,
+        Long todoId,
+        String title,
         @NotNull(message = "시작 시각을 입력해주세요.") Instant startedAt,
         @NotNull(message = "종료 시각을 입력해주세요.") Instant endedAt
     ) {
