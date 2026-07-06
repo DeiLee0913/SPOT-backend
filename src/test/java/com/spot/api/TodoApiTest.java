@@ -270,6 +270,94 @@ class TodoApiTest {
     }
 
     @Test
+    void deleteTodoUnlinksSessions() throws Exception {
+        String token = newUserToken();
+
+        MvcResult todo = mockMvc.perform(asUser(post("/todos/quick"), token)
+                .content("{\"title\":\"To remove\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long todoId = dataNode(todo).get("todoId").asLong();
+
+        MvcResult session = mockMvc.perform(asUser(post("/sessions/start"), token)
+                .content("{\"todoId\":" + todoId + "}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long sessionId = dataNode(session).get("sessionId").asLong();
+
+        mockMvc.perform(asUser(delete("/todos/" + todoId), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success", is(true)));
+
+        mockMvc.perform(asUser(get("/todos"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.today", hasSize(0)));
+
+        mockMvc.perform(asUser(get("/sessions/open"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.sessionId", is((int) sessionId)))
+            .andExpect(jsonPath("$.data.todoId").value(nullValue()))
+            .andExpect(jsonPath("$.data.title").value(nullValue()));
+    }
+
+    @Test
+    void duplicateTodoCreatesOpenCopy() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Meetings\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"sync\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId = dataNode(tag).get("tagId").asLong();
+
+        MvcResult created = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Standup",
+                      "categoryId": %d,
+                      "tagIds": [%d],
+                      "priority": 1,
+                      "dueStudyDay": "2026-06-27",
+                      "startTime": "10:00",
+                      "endTime": "10:30"
+                    }
+                    """.formatted(categoryId, tagId)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long todoId = dataNode(created).get("todoId").asLong();
+
+        mockMvc.perform(asUser(post("/todos/" + todoId + "/complete"), token))
+            .andExpect(status().isOk());
+
+        MvcResult duplicated = mockMvc.perform(asUser(post("/todos/" + todoId + "/duplicate"), token))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.title", is("Standup")))
+            .andExpect(jsonPath("$.data.status", is("OPEN")))
+            .andExpect(jsonPath("$.data.priority", is(1)))
+            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
+            .andExpect(jsonPath("$.data.endTime", is("10:30:00")))
+            .andExpect(jsonPath("$.data.category.categoryId", is((int) categoryId)))
+            .andExpect(jsonPath("$.data.tags[0].tagId", is((int) tagId)))
+            .andExpect(jsonPath("$.data.doneAt").value(nullValue()))
+            .andReturn();
+        long copyId = dataNode(duplicated).get("todoId").asLong();
+
+        mockMvc.perform(asUser(get("/todos"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.today.length()", is(1)))
+            .andExpect(jsonPath("$.data.today[0].todoId", is((int) copyId)))
+            .andExpect(jsonPath("$.data.done.length()", is(1)))
+            .andExpect(jsonPath("$.data.done[0].todoId", is((int) todoId)));
+    }
+
+    @Test
     void createAndUpdateTodoWithOptionalTime() throws Exception {
         String token = newUserToken();
 

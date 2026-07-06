@@ -140,6 +140,25 @@ public class TodoController {
         return ApiResponse.ok(TodoItemResponse.from(todoService.rescheduleToday(currentUser.userId(), todoId)));
     }
 
+    @DeleteMapping("/{todoId}")
+    public ApiResponse<Void> delete(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long todoId
+    ) {
+        todoService.delete(currentUser.userId(), todoId);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{todoId}/duplicate")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<TodoItemResponse> duplicate(
+        @CurrentUser AuthenticatedUser currentUser,
+        @PathVariable Long todoId
+    ) {
+        TodoItem item = todoService.duplicate(currentUser.userId(), todoId);
+        return ApiResponse.ok(TodoItemResponse.from(item));
+    }
+
     @GetMapping("/categories")
     public ApiResponse<List<CategoryResponse>> listCategories(@CurrentUser AuthenticatedUser currentUser) {
         List<CategoryResponse> categories = todoService.listCategories(currentUser.userId()).stream()

@@ -5,6 +5,7 @@ import com.spot.common.BadRequestException;
 import com.spot.common.ConflictException;
 import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
+import com.spot.domain.session.StudySessionRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -27,17 +28,20 @@ public class TodoService {
     private final TodoItemRepository todoItemRepository;
     private final TodoCategoryRepository categoryRepository;
     private final TodoTagRepository tagRepository;
+    private final StudySessionRepository sessionRepository;
     private final StudyDayService studyDayService;
 
     public TodoService(
         TodoItemRepository todoItemRepository,
         TodoCategoryRepository categoryRepository,
         TodoTagRepository tagRepository,
+        StudySessionRepository sessionRepository,
         StudyDayService studyDayService
     ) {
         this.todoItemRepository = todoItemRepository;
         this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
+        this.sessionRepository = sessionRepository;
         this.studyDayService = studyDayService;
     }
 
@@ -167,6 +171,27 @@ public class TodoService {
         TodoItem item = getOwned(userId, todoId);
         item.rescheduleTo(studyDayService.currentStudyDay());
         return item;
+    }
+
+    @Transactional
+    public void delete(Long userId, Long todoId) {
+        getOwned(userId, todoId);
+        sessionRepository.clearTodoId(userId, todoId);
+        todoItemRepository.deleteById(todoId);
+    }
+
+    @Transactional
+    public TodoItem duplicate(Long userId, Long todoId) {
+        TodoItem source = getOwned(userId, todoId);
+        TodoItem copy = new TodoItem(userId, source.getTitle(), source.getDueStudyDay());
+        copy.setPriority(source.getPriority());
+        copy.setStartTime(source.getStartTime());
+        copy.setEndTime(source.getEndTime());
+        copy.assignCategory(source.getCategory());
+        if (!source.getTags().isEmpty()) {
+            copy.replaceTags(new HashSet<>(source.getTags()));
+        }
+        return todoItemRepository.save(copy);
     }
 
     @Transactional

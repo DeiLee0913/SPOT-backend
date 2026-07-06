@@ -5,6 +5,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface StudySessionRepository extends JpaRepository<StudySession, Long> {
 
@@ -26,4 +29,12 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
         LocalDate from,
         LocalDate to
     );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update StudySession s
+        set s.todoId = null
+        where s.userId = :userId and s.todoId = :todoId
+        """)
+    void clearTodoId(@Param("userId") Long userId, @Param("todoId") Long todoId);
 }
