@@ -7,6 +7,7 @@ import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -86,12 +87,17 @@ public class TodoService {
         Long categoryId,
         List<Long> tagIds,
         Integer priority,
-        LocalDate dueStudyDay
+        LocalDate dueStudyDay,
+        LocalTime startTime,
+        LocalTime endTime
     ) {
         String title = validateTitle(rawTitle);
         validatePriority(priority);
+        validateTimeRange(startTime, endTime);
         TodoItem item = new TodoItem(userId, title, dueStudyDay);
         item.setPriority(priority);
+        item.setStartTime(startTime);
+        item.setEndTime(endTime);
         applyCategory(userId, item, categoryId);
         applyTags(userId, item, tagIds);
         return todoItemRepository.save(item);
@@ -107,7 +113,11 @@ public class TodoService {
         Integer priority,
         LocalDate dueStudyDay,
         boolean clearCategory,
-        boolean clearDue
+        boolean clearDue,
+        LocalTime startTime,
+        LocalTime endTime,
+        boolean clearStartTime,
+        boolean clearEndTime
     ) {
         TodoItem item = getOwned(userId, todoId);
         if (rawTitle != null) {
@@ -123,6 +133,7 @@ public class TodoService {
         } else if (dueStudyDay != null) {
             item.setDueStudyDay(dueStudyDay);
         }
+        applyTimes(item, startTime, endTime, clearStartTime, clearEndTime);
         if (tagIds != null) {
             applyTags(userId, item, tagIds);
             validatePriority(priority);
@@ -275,6 +286,7 @@ public class TodoService {
             .sorted(Comparator
                 .comparing(TodoItem::getPriority, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TodoItem::getDueStudyDay, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TodoItem::getStartTime, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TodoItem::getCreatedAt))
             .toList();
     }
@@ -330,6 +342,36 @@ public class TodoService {
         }
         if (priority < 1 || priority > 4) {
             throw new BadRequestException("INVALID_PRIORITY", "우선순위는 1~4 사이여야 합니다.");
+        }
+    }
+
+    private void applyTimes(
+        TodoItem item,
+        LocalTime startTime,
+        LocalTime endTime,
+        boolean clearStartTime,
+        boolean clearEndTime
+    ) {
+        LocalTime newStart = item.getStartTime();
+        LocalTime newEnd = item.getEndTime();
+        if (clearStartTime) {
+            newStart = null;
+        } else if (startTime != null) {
+            newStart = startTime;
+        }
+        if (clearEndTime) {
+            newEnd = null;
+        } else if (endTime != null) {
+            newEnd = endTime;
+        }
+        validateTimeRange(newStart, newEnd);
+        item.setStartTime(newStart);
+        item.setEndTime(newEnd);
+    }
+
+    private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
+        if (startTime != null && endTime != null && endTime.isBefore(startTime)) {
+            throw new BadRequestException("INVALID_TIME_RANGE", "종료 시간은 시작 시간 이후여야 합니다.");
         }
     }
 

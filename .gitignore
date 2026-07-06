@@ -36,6 +36,9 @@ out/
 ### VS Code ###
 .vscode/
 
+### Cursor (로컬 전용) ###
+.cursor/
+
 ### Local configuration and secrets ###
 .env
 .env.*

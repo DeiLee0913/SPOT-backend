@@ -102,7 +102,7 @@ public class SessionService {
         ensureNoOverlap(userId, startedAt, endedAt);
 
         LocalDate studyDay = studyDayService.toStudyDay(startedAt);
-        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay);
+        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay, null, null);
         return sessionRepository.save(StudySession.manual(userId, studyDay, todo.getId(), startedAt, endedAt));
     }
 

@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 public final class TodoDtos {
@@ -25,7 +26,9 @@ public final class TodoDtos {
         Long categoryId,
         List<Long> tagIds,
         @Min(1) @Max(4) Integer priority,
-        LocalDate dueStudyDay
+        LocalDate dueStudyDay,
+        LocalTime startTime,
+        LocalTime endTime
     ) {
     }
 
@@ -36,7 +39,11 @@ public final class TodoDtos {
         List<Long> tagIds,
         @Min(1) @Max(4) Integer priority,
         LocalDate dueStudyDay,
-        Boolean clearDue
+        Boolean clearDue,
+        LocalTime startTime,
+        LocalTime endTime,
+        Boolean clearStartTime,
+        Boolean clearEndTime
     ) {
     }
 
@@ -81,6 +88,8 @@ public final class TodoDtos {
         List<TagResponse> tags,
         Integer priority,
         LocalDate dueStudyDay,
+        LocalTime startTime,
+        LocalTime endTime,
         String status,
         Instant doneAt,
         Instant createdAt
@@ -99,6 +108,8 @@ public final class TodoDtos {
                 tags,
                 item.getPriority(),
                 item.getDueStudyDay(),
+                item.getStartTime(),
+                item.getEndTime(),
                 item.getStatus().name(),
                 item.getDoneAt(),
                 item.getCreatedAt()

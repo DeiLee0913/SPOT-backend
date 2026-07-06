@@ -270,6 +270,47 @@ class TodoApiTest {
     }
 
     @Test
+    void createAndUpdateTodoWithOptionalTime() throws Exception {
+        String token = newUserToken();
+
+        MvcResult created = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Team sync",
+                      "dueStudyDay": "2026-06-27",
+                      "startTime": "14:00",
+                      "endTime": "15:30"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.startTime", is("14:00:00")))
+            .andExpect(jsonPath("$.data.endTime", is("15:30:00")))
+            .andReturn();
+        long todoId = dataNode(created).get("todoId").asLong();
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "startTime": "10:00",
+                      "clearEndTime": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "startTime": "16:00",
+                      "endTime": "15:00"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code", is("INVALID_TIME_RANGE")));
+    }
+
+    @Test
     void linkTodoToSession() throws Exception {
         String token = newUserToken();
 
