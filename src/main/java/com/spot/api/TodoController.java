@@ -82,6 +82,7 @@ public class TodoController {
         TodoItem item = todoService.create(
             currentUser.userId(),
             request.title(),
+            request.description(),
             request.categoryId(),
             request.tagIds(),
             request.priority(),
@@ -103,6 +104,7 @@ public class TodoController {
             currentUser.userId(),
             todoId,
             request.title(),
+            request.description(),
             request.categoryId(),
             request.tagIds(),
             request.priority(),
@@ -114,7 +116,8 @@ public class TodoController {
             request.endStudyDay(),
             Boolean.TRUE.equals(request.clearStartTime()),
             Boolean.TRUE.equals(request.clearEndTime()),
-            Boolean.TRUE.equals(request.clearEndStudyDay())
+            Boolean.TRUE.equals(request.clearEndStudyDay()),
+            Boolean.TRUE.equals(request.clearDescription())
         );
         return ApiResponse.ok(TodoItemResponse.from(item));
     }

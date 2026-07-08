@@ -39,6 +39,9 @@ public class TodoItem {
     @Column(nullable = false, length = 200)
     private String title;
 
+    @Column(columnDefinition = "text")
+    private String description;
+
     @Column(name = "due_study_day")
     private LocalDate dueStudyDay;
 
@@ -138,6 +141,14 @@ public class TodoItem {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public LocalDate getDueStudyDay() {

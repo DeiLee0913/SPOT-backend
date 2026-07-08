@@ -358,6 +358,42 @@ class TodoApiTest {
     }
 
     @Test
+    void createAndUpdateTodoWithDescription() throws Exception {
+        String token = newUserToken();
+
+        MvcResult created = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Project plan",
+                      "description": "Prep notes\\n- [ ] Draft outline\\n- [x] Review slides",
+                      "dueStudyDay": "2026-06-27"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.description", is("Prep notes\n- [ ] Draft outline\n- [x] Review slides")))
+            .andReturn();
+        long todoId = dataNode(created).get("todoId").asLong();
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "description": "Updated body"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.description", is("Updated body")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "clearDescription": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.description").value(nullValue()));
+    }
+
+    @Test
     void createAndUpdateTodoWithOptionalTime() throws Exception {
         String token = newUserToken();
 

@@ -23,6 +23,7 @@ public final class TodoDtos {
 
     public record CreateTodoRequest(
         @NotBlank(message = "할 일 제목을 입력해주세요.") String title,
+        String description,
         Long categoryId,
         List<Long> tagIds,
         @Min(1) @Max(4) Integer priority,
@@ -35,6 +36,8 @@ public final class TodoDtos {
 
     public record UpdateTodoRequest(
         String title,
+        String description,
+        Boolean clearDescription,
         Long categoryId,
         Boolean clearCategory,
         List<Long> tagIds,
@@ -87,6 +90,7 @@ public final class TodoDtos {
     public record TodoItemResponse(
         Long todoId,
         String title,
+        String description,
         CategoryResponse category,
         List<TagResponse> tags,
         Integer priority,
@@ -108,6 +112,7 @@ public final class TodoDtos {
             return new TodoItemResponse(
                 item.getId(),
                 item.getTitle(),
+                item.getDescription(),
                 category,
                 tags,
                 item.getPriority(),

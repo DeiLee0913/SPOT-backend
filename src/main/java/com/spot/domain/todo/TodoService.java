@@ -23,6 +23,7 @@ import org.springframework.util.StringUtils;
 public class TodoService {
 
     public static final int MAX_TITLE_LENGTH = 200;
+    public static final int MAX_DESCRIPTION_LENGTH = 10_000;
     public static final int MAX_NAME_LENGTH = 50;
     private static final String DEFAULT_CATEGORY_COLOR = "#64748B";
 
@@ -89,6 +90,7 @@ public class TodoService {
     public TodoItem create(
         Long userId,
         String rawTitle,
+        String rawDescription,
         Long categoryId,
         List<Long> tagIds,
         Integer priority,
@@ -102,6 +104,7 @@ public class TodoService {
         LocalDate effectiveEndDay = resolveEndStudyDay(dueStudyDay, endStudyDay, endTime);
         validateSchedule(dueStudyDay, startTime, effectiveEndDay, endTime);
         TodoItem item = new TodoItem(userId, title, dueStudyDay);
+        item.setDescription(validateDescription(rawDescription));
         item.setPriority(priority);
         item.setStartTime(startTime);
         item.setEndTime(endTime);
@@ -116,6 +119,7 @@ public class TodoService {
         Long userId,
         Long todoId,
         String rawTitle,
+        String rawDescription,
         Long categoryId,
         List<Long> tagIds,
         Integer priority,
@@ -127,11 +131,17 @@ public class TodoService {
         LocalDate endStudyDay,
         boolean clearStartTime,
         boolean clearEndTime,
-        boolean clearEndStudyDay
+        boolean clearEndStudyDay,
+        boolean clearDescription
     ) {
         TodoItem item = getOwned(userId, todoId);
         if (rawTitle != null) {
             item.setTitle(validateTitle(rawTitle));
+        }
+        if (clearDescription) {
+            item.setDescription(null);
+        } else if (rawDescription != null) {
+            item.setDescription(validateDescription(rawDescription));
         }
         if (clearCategory) {
             item.assignCategory(null);
@@ -198,6 +208,7 @@ public class TodoService {
     public TodoItem duplicate(Long userId, Long todoId) {
         TodoItem source = getOwned(userId, todoId);
         TodoItem copy = new TodoItem(userId, copyTitle(source.getTitle()), source.getDueStudyDay());
+        copy.setDescription(source.getDescription());
         copy.setPriority(source.getPriority());
         copy.setStartTime(source.getStartTime());
         copy.setEndTime(source.getEndTime());
@@ -363,6 +374,20 @@ public class TodoService {
             throw new BadRequestException("TITLE_TOO_LONG", "제목은 200자 이하여야 합니다.");
         }
         return title;
+    }
+
+    private String validateDescription(String rawDescription) {
+        if (rawDescription == null) {
+            return null;
+        }
+        String trimmed = rawDescription.trim();
+        if (!StringUtils.hasText(trimmed)) {
+            return null;
+        }
+        if (trimmed.length() > MAX_DESCRIPTION_LENGTH) {
+            throw new BadRequestException("DESCRIPTION_TOO_LONG", "설명은 10000자 이하여야 합니다.");
+        }
+        return trimmed;
     }
 
     private String copyTitle(String title) {
