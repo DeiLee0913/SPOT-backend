@@ -8,6 +8,7 @@ import com.spot.common.StudyDayService;
 import com.spot.domain.session.StudySessionRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -93,15 +94,18 @@ public class TodoService {
         Integer priority,
         LocalDate dueStudyDay,
         LocalTime startTime,
-        LocalTime endTime
+        LocalTime endTime,
+        LocalDate endStudyDay
     ) {
         String title = validateTitle(rawTitle);
         validatePriority(priority);
-        validateTimeRange(startTime, endTime);
+        LocalDate effectiveEndDay = resolveEndStudyDay(dueStudyDay, endStudyDay, endTime);
+        validateSchedule(dueStudyDay, startTime, effectiveEndDay, endTime);
         TodoItem item = new TodoItem(userId, title, dueStudyDay);
         item.setPriority(priority);
         item.setStartTime(startTime);
         item.setEndTime(endTime);
+        item.setEndStudyDay(effectiveEndDay);
         applyCategory(userId, item, categoryId);
         applyTags(userId, item, tagIds);
         return todoItemRepository.save(item);
@@ -120,8 +124,10 @@ public class TodoService {
         boolean clearDue,
         LocalTime startTime,
         LocalTime endTime,
+        LocalDate endStudyDay,
         boolean clearStartTime,
-        boolean clearEndTime
+        boolean clearEndTime,
+        boolean clearEndStudyDay
     ) {
         TodoItem item = getOwned(userId, todoId);
         if (rawTitle != null) {
@@ -137,7 +143,15 @@ public class TodoService {
         } else if (dueStudyDay != null) {
             item.setDueStudyDay(dueStudyDay);
         }
-        applyTimes(item, startTime, endTime, clearStartTime, clearEndTime);
+        applySchedule(
+            item,
+            startTime,
+            endTime,
+            endStudyDay,
+            clearStartTime,
+            clearEndTime,
+            clearEndStudyDay
+        );
         if (tagIds != null) {
             applyTags(userId, item, tagIds);
             validatePriority(priority);
@@ -183,10 +197,11 @@ public class TodoService {
     @Transactional
     public TodoItem duplicate(Long userId, Long todoId) {
         TodoItem source = getOwned(userId, todoId);
-        TodoItem copy = new TodoItem(userId, source.getTitle(), source.getDueStudyDay());
+        TodoItem copy = new TodoItem(userId, copyTitle(source.getTitle()), source.getDueStudyDay());
         copy.setPriority(source.getPriority());
         copy.setStartTime(source.getStartTime());
         copy.setEndTime(source.getEndTime());
+        copy.setEndStudyDay(source.getEndStudyDay());
         copy.assignCategory(source.getCategory());
         if (!source.getTags().isEmpty()) {
             copy.replaceTags(new HashSet<>(source.getTags()));
@@ -350,6 +365,16 @@ public class TodoService {
         return title;
     }
 
+    private String copyTitle(String title) {
+        String base = title == null ? "" : title;
+        String suffix = "_copy";
+        String candidate = base + suffix;
+        if (candidate.length() > MAX_TITLE_LENGTH) {
+            candidate = base.substring(0, MAX_TITLE_LENGTH - suffix.length()) + suffix;
+        }
+        return candidate;
+    }
+
     private String validateName(String rawName) {
         String name = rawName == null ? "" : rawName.trim();
         if (!StringUtils.hasText(name)) {
@@ -370,15 +395,18 @@ public class TodoService {
         }
     }
 
-    private void applyTimes(
+    private void applySchedule(
         TodoItem item,
         LocalTime startTime,
         LocalTime endTime,
+        LocalDate endStudyDay,
         boolean clearStartTime,
-        boolean clearEndTime
+        boolean clearEndTime,
+        boolean clearEndStudyDay
     ) {
         LocalTime newStart = item.getStartTime();
         LocalTime newEnd = item.getEndTime();
+        LocalDate newEndDay = item.getEndStudyDay();
         if (clearStartTime) {
             newStart = null;
         } else if (startTime != null) {
@@ -389,14 +417,45 @@ public class TodoService {
         } else if (endTime != null) {
             newEnd = endTime;
         }
-        validateTimeRange(newStart, newEnd);
+        if (clearEndStudyDay) {
+            newEndDay = null;
+        } else if (endStudyDay != null) {
+            newEndDay = endStudyDay;
+        }
+        newEndDay = resolveEndStudyDay(item.getDueStudyDay(), newEndDay, newEnd);
+        validateSchedule(item.getDueStudyDay(), newStart, newEndDay, newEnd);
         item.setStartTime(newStart);
         item.setEndTime(newEnd);
+        item.setEndStudyDay(newEndDay);
     }
 
-    private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
-        if (startTime != null && endTime != null && endTime.isBefore(startTime)) {
-            throw new BadRequestException("INVALID_TIME_RANGE", "종료 시간은 시작 시간 이후여야 합니다.");
+    private LocalDate resolveEndStudyDay(LocalDate dueStudyDay, LocalDate endStudyDay, LocalTime endTime) {
+        if (endStudyDay != null) {
+            return endStudyDay;
+        }
+        if (endTime != null) {
+            return dueStudyDay;
+        }
+        return null;
+    }
+
+    private void validateSchedule(
+        LocalDate dueStudyDay,
+        LocalTime startTime,
+        LocalDate endStudyDay,
+        LocalTime endTime
+    ) {
+        if (startTime == null && endTime == null && endStudyDay == null) {
+            return;
+        }
+        if (dueStudyDay == null) {
+            throw new BadRequestException("START_DATE_REQUIRED", "종료·시간을 설정하려면 시작 날짜를 먼저 지정해주세요.");
+        }
+        LocalDate effectiveEndDay = endStudyDay != null ? endStudyDay : dueStudyDay;
+        LocalDateTime start = LocalDateTime.of(dueStudyDay, startTime != null ? startTime : LocalTime.MIN);
+        LocalDateTime end = LocalDateTime.of(effectiveEndDay, endTime != null ? endTime : LocalTime.MAX);
+        if (!end.isAfter(start)) {
+            throw new BadRequestException("INVALID_TIME_RANGE", "종료 시각은 시작 시각 이후여야 합니다.");
         }
     }
 

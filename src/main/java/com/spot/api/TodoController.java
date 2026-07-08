@@ -87,7 +87,8 @@ public class TodoController {
             request.priority(),
             request.dueStudyDay(),
             request.startTime(),
-            request.endTime()
+            request.endTime(),
+            request.endStudyDay()
         );
         return ApiResponse.ok(TodoItemResponse.from(item));
     }
@@ -110,8 +111,10 @@ public class TodoController {
             Boolean.TRUE.equals(request.clearDue()),
             request.startTime(),
             request.endTime(),
+            request.endStudyDay(),
             Boolean.TRUE.equals(request.clearStartTime()),
-            Boolean.TRUE.equals(request.clearEndTime())
+            Boolean.TRUE.equals(request.clearEndTime()),
+            Boolean.TRUE.equals(request.clearEndStudyDay())
         );
         return ApiResponse.ok(TodoItemResponse.from(item));
     }

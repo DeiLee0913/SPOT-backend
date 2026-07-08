@@ -48,6 +48,9 @@ public class TodoItem {
     @Column(name = "end_time")
     private LocalTime endTime;
 
+    @Column(name = "end_study_day")
+    private LocalDate endStudyDay;
+
     @Column
     private Integer priority;
 
@@ -159,6 +162,14 @@ public class TodoItem {
 
     public void setEndTime(LocalTime endTime) {
         this.endTime = endTime;
+    }
+
+    public LocalDate getEndStudyDay() {
+        return endStudyDay;
+    }
+
+    public void setEndStudyDay(LocalDate endStudyDay) {
+        this.endStudyDay = endStudyDay;
     }
 
     public Integer getPriority() {

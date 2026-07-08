@@ -337,7 +337,7 @@ class TodoApiTest {
 
         MvcResult duplicated = mockMvc.perform(asUser(post("/todos/" + todoId + "/duplicate"), token))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.title", is("Standup")))
+            .andExpect(jsonPath("$.data.title", is("Standup_copy")))
             .andExpect(jsonPath("$.data.status", is("OPEN")))
             .andExpect(jsonPath("$.data.priority", is(1)))
             .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
@@ -385,7 +385,17 @@ class TodoApiTest {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
-            .andExpect(jsonPath("$.data.endTime").value(nullValue()));
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()))
+            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-27")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "clearEndStudyDay": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endStudyDay").value(nullValue()));
 
         mockMvc.perform(asUser(patch("/todos/" + todoId), token)
                 .content("""
@@ -396,6 +406,78 @@ class TodoApiTest {
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.code", is("INVALID_TIME_RANGE")));
+    }
+
+    @Test
+    void todoScheduleAllowsEndDateOnly() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Multi-day block",
+                      "dueStudyDay": "2026-06-27",
+                      "endStudyDay": "2026-06-29"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-29")))
+            .andExpect(jsonPath("$.data.startTime").value(nullValue()))
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()));
+    }
+
+    @Test
+    void todoScheduleAllowsEndTimeOnlyOnStartDay() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Deadline",
+                      "dueStudyDay": "2026-06-27",
+                      "endTime": "18:00"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.endTime", is("18:00:00")));
+    }
+
+    @Test
+    void todoScheduleRequiresStartDateWhenTimeSet() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "No start date",
+                      "startTime": "10:00"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code", is("START_DATE_REQUIRED")));
+    }
+
+    @Test
+    void todoScheduleAllowsMultiDayEnd() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Overnight workshop",
+                      "dueStudyDay": "2026-06-27",
+                      "startTime": "22:00",
+                      "endStudyDay": "2026-06-28",
+                      "endTime": "06:00"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.startTime", is("22:00:00")))
+            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.endTime", is("06:00:00")));
     }
 
     @Test

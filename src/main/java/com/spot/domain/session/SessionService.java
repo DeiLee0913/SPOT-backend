@@ -189,7 +189,7 @@ public class SessionService {
             return todoId;
         }
         String title = validateTitle(rawTitle);
-        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay, null, null);
+        TodoItem todo = todoService.create(userId, title, null, null, null, studyDay, null, null, null);
         return todo.getId();
     }
 

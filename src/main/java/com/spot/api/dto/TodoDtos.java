@@ -28,7 +28,8 @@ public final class TodoDtos {
         @Min(1) @Max(4) Integer priority,
         LocalDate dueStudyDay,
         LocalTime startTime,
-        LocalTime endTime
+        LocalTime endTime,
+        LocalDate endStudyDay
     ) {
     }
 
@@ -42,8 +43,10 @@ public final class TodoDtos {
         Boolean clearDue,
         LocalTime startTime,
         LocalTime endTime,
+        LocalDate endStudyDay,
         Boolean clearStartTime,
-        Boolean clearEndTime
+        Boolean clearEndTime,
+        Boolean clearEndStudyDay
     ) {
     }
 
@@ -90,6 +93,7 @@ public final class TodoDtos {
         LocalDate dueStudyDay,
         LocalTime startTime,
         LocalTime endTime,
+        LocalDate endStudyDay,
         String status,
         Instant doneAt,
         Instant createdAt
@@ -110,6 +114,7 @@ public final class TodoDtos {
                 item.getDueStudyDay(),
                 item.getStartTime(),
                 item.getEndTime(),
+                item.getEndStudyDay(),
                 item.getStatus().name(),
                 item.getDoneAt(),
                 item.getCreatedAt()
