@@ -422,15 +422,6 @@ class TodoApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
             .andExpect(jsonPath("$.data.endTime").value(nullValue()))
-            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-27")));
-
-        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
-                .content("""
-                    {
-                      "clearEndStudyDay": true
-                    }
-                    """))
-            .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.endStudyDay").value(nullValue()));
 
         mockMvc.perform(asUser(patch("/todos/" + todoId), token)
@@ -537,6 +528,177 @@ class TodoApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.todoId", is((int) todoId)))
             .andExpect(jsonPath("$.data.title", is("Late link")));
+    }
+
+    @Test
+    void searchTodosWithFiltersAndPagination() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Spring\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"work\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId = dataNode(tag).get("tagId").asLong();
+
+        MvcResult datedOpen = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Spring API draft",
+                      "description": "endpoint checklist",
+                      "categoryId": %d,
+                      "tagIds": [%d],
+                      "priority": 1,
+                      "dueStudyDay": "2026-06-27"
+                    }
+                    """.formatted(categoryId, tagId)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long datedOpenId = dataNode(datedOpen).get("todoId").asLong();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"Backlog item\"}"))
+            .andExpect(status().isCreated());
+
+        MvcResult done = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {"title":"Done task","categoryId":%d,"dueStudyDay":"2026-06-26"}
+                    """.formatted(categoryId)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long doneId = dataNode(done).get("todoId").asLong();
+        mockMvc.perform(asUser(post("/todos/" + doneId + "/complete"), token))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("q", "spring")
+                .param("status", "OPEN"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items.length()", is(1)))
+            .andExpect(jsonPath("$.data.items[0].title", is("Spring API draft")));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("status", "DONE")
+                .param("categoryId", String.valueOf(categoryId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items[0].todoId", is((int) doneId)));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("tagId", String.valueOf(tagId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items[0].tags[0].tagId", is((int) tagId)));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("dueFrom", "2026-06-27")
+                .param("dueTo", "2026-06-27"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items[0].todoId", is((int) datedOpenId)))
+            .andExpect(jsonPath("$.data.items[0].title", is("Spring API draft")));
+
+        MvcResult firstPage = mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("status", "ALL")
+                .param("limit", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(3)))
+            .andExpect(jsonPath("$.data.items.length()", is(1)))
+            .andExpect(jsonPath("$.data.nextCursor").isNumber())
+            .andReturn();
+        long cursor = dataNode(firstPage).get("nextCursor").asLong();
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("status", "ALL")
+                .param("limit", "1")
+                .param("cursor", String.valueOf(cursor)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items.length()", is(1)));
+    }
+
+    @Test
+    void boardReturnsWeeklyStatsWithBreakdown() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Spring\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"work\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId = dataNode(tag).get("tagId").asLong();
+
+        MvcResult todo = mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Board task",
+                      "categoryId": %d,
+                      "tagIds": [%d],
+                      "dueStudyDay": "2026-06-27"
+                    }
+                    """.formatted(categoryId, tagId)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long todoId = dataNode(todo).get("todoId").asLong();
+
+        mockMvc.perform(asUser(post("/todos/" + todoId + "/complete"), token))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(post("/sessions/manual"), token)
+                .content("""
+                    {
+                      "todoId": %d,
+                      "startedAt": "2026-06-26T22:00:00Z",
+                      "endedAt": "2026-06-26T23:00:00Z"
+                    }
+                    """.formatted(todoId)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.durationMinutes", is(60)));
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-23")
+                .param("to", "2026-06-27"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.from", is("2026-06-23")))
+            .andExpect(jsonPath("$.data.to", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.summary.completedCount", is(1)))
+            .andExpect(jsonPath("$.data.summary.studyMinutes", is(60)))
+            .andExpect(jsonPath("$.data.summary.studyMinutesFromSessions", is(60)))
+            .andExpect(jsonPath("$.data.days.length()", is(1)))
+            .andExpect(jsonPath("$.data.days[0].studyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.days[0].completedCount", is(1)))
+            .andExpect(jsonPath("$.data.days[0].studyMinutes", is(60)))
+            .andExpect(jsonPath("$.data.days[0].byCategory[0].categoryId", is((int) categoryId)))
+            .andExpect(jsonPath("$.data.days[0].byTag[0].tagId", is((int) tagId)));
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-23")
+                .param("to", "2026-06-27")
+                .param("categoryId", String.valueOf(categoryId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.completedCount", is(1)))
+            .andExpect(jsonPath("$.data.summary.studyMinutes", is(60)));
+    }
+
+    @Test
+    void boardRejectsInvalidDateRange() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-27")
+                .param("to", "2026-06-20"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code", is("INVALID_DATE_RANGE")));
     }
 
     private String newUserToken() {

@@ -42,6 +42,53 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
         @Param("dayEnd") Instant dayEnd
     );
 
+    @EntityGraph(attributePaths = {"category", "tags"})
+    List<TodoItem> findByUserIdAndStatus(Long userId, TodoItemStatus status);
+
+    @EntityGraph(attributePaths = {"category", "tags"})
+    List<TodoItem> findByUserIdAndStatusAndDueStudyDayBetween(
+        Long userId,
+        TodoItemStatus status,
+        LocalDate from,
+        LocalDate to
+    );
+
+    @EntityGraph(attributePaths = {"category", "tags"})
+    @Query("""
+        select distinct t from TodoItem t
+        left join t.category c
+        left join t.tags tag
+        where t.userId = :userId
+          and (:status is null or t.status = :status)
+          and (:categoryId is null or c.id = :categoryId)
+          and (:tagId is null or tag.id = :tagId)
+          and (
+            (:dueFrom is null and :dueTo is null)
+            or (
+              t.dueStudyDay is not null
+              and (:dueFrom is null or t.dueStudyDay >= :dueFrom)
+              and (:dueTo is null or t.dueStudyDay <= :dueTo)
+            )
+          )
+          and (
+            :q is null
+            or lower(t.title) like lower(concat('%', :q, '%'))
+            or lower(t.description) like lower(concat('%', :q, '%'))
+            or lower(c.name) like lower(concat('%', :q, '%'))
+            or lower(tag.name) like lower(concat('%', :q, '%'))
+          )
+        """)
+    List<TodoItem> search(
+        @Param("userId") Long userId,
+        @Param("q") String q,
+        @Param("status") TodoItemStatus status,
+        @Param("categoryId") Long categoryId,
+        @Param("tagId") Long tagId,
+        @Param("dueFrom") LocalDate dueFrom,
+        @Param("dueTo") LocalDate dueTo
+    );
+
+    @EntityGraph(attributePaths = {"category", "tags"})
     List<TodoItem> findByIdIn(Collection<Long> ids);
 
     List<TodoItem> findByUserIdAndCategory_Id(Long userId, Long categoryId);

@@ -6,8 +6,10 @@ import com.spot.api.dto.TodoDtos.CreateTagRequest;
 import com.spot.api.dto.TodoDtos.CreateTodoRequest;
 import com.spot.api.dto.TodoDtos.QuickCreateRequest;
 import com.spot.api.dto.TodoDtos.TagResponse;
+import com.spot.api.dto.TodoDtos.TodoBoardResponse;
 import com.spot.api.dto.TodoDtos.TodoDayResponse;
 import com.spot.api.dto.TodoDtos.TodoItemResponse;
+import com.spot.api.dto.TodoDtos.TodoSearchResponse;
 import com.spot.api.dto.TodoDtos.UpdateCategoryRequest;
 import com.spot.api.dto.TodoDtos.UpdateTagRequest;
 import com.spot.api.dto.TodoDtos.UpdateTodoRequest;
@@ -61,6 +63,48 @@ public class TodoController {
     @GetMapping("/picker")
     public ApiResponse<List<TodoItemResponse>> picker(@CurrentUser AuthenticatedUser currentUser) {
         return ApiResponse.ok(todoService.listPickerForToday(currentUser.userId()));
+    }
+
+    @GetMapping("/search")
+    public ApiResponse<TodoSearchResponse> search(
+        @CurrentUser AuthenticatedUser currentUser,
+        @RequestParam(required = false) String q,
+        @RequestParam(required = false, defaultValue = "ALL") String status,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) Long tagId,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueTo,
+        @RequestParam(required = false) Integer limit,
+        @RequestParam(required = false) Long cursor
+    ) {
+        return ApiResponse.ok(todoService.search(
+            currentUser.userId(),
+            q,
+            status,
+            categoryId,
+            tagId,
+            dueFrom,
+            dueTo,
+            limit,
+            cursor
+        ));
+    }
+
+    @GetMapping("/board")
+    public ApiResponse<TodoBoardResponse> board(
+        @CurrentUser AuthenticatedUser currentUser,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) Long tagId
+    ) {
+        return ApiResponse.ok(todoService.board(
+            currentUser.userId(),
+            from,
+            to,
+            categoryId,
+            tagId
+        ));
     }
 
     @PostMapping("/quick")
