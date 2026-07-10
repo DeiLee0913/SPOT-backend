@@ -1,20 +1,34 @@
 package com.spot.domain.todo;
 
+import com.spot.api.dto.TodoDtos.TodoBoardCategoryBreakdown;
+import com.spot.api.dto.TodoDtos.TodoBoardDayStats;
+import com.spot.api.dto.TodoDtos.TodoBoardResponse;
+import com.spot.api.dto.TodoDtos.TodoBoardSummary;
+import com.spot.api.dto.TodoDtos.TodoBoardTagBreakdown;
 import com.spot.api.dto.TodoDtos.TodoItemResponse;
+import com.spot.api.dto.TodoDtos.TodoSearchResponse;
 import com.spot.common.BadRequestException;
 import com.spot.common.ConflictException;
 import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
+import com.spot.domain.session.SessionStatus;
+import com.spot.domain.session.StudySession;
 import com.spot.domain.session.StudySessionRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -25,7 +39,16 @@ public class TodoService {
     public static final int MAX_TITLE_LENGTH = 200;
     public static final int MAX_DESCRIPTION_LENGTH = 10_000;
     public static final int MAX_NAME_LENGTH = 50;
+    private static final int DEFAULT_SEARCH_LIMIT = 50;
+    private static final int MAX_SEARCH_LIMIT = 100;
+    private static final int MAX_BOARD_RANGE_DAYS = 60;
     private static final String DEFAULT_CATEGORY_COLOR = "#64748B";
+    private static final String UNCategorized = "Uncategorized";
+    private static final Comparator<TodoItem> SEARCH_SORT = Comparator
+        .comparing((TodoItem item) -> item.getStatus() == TodoItemStatus.DONE)
+        .thenComparing(TodoItem::getPriority, Comparator.nullsLast(Comparator.naturalOrder()))
+        .thenComparing(TodoItem::getDueStudyDay, Comparator.nullsLast(Comparator.naturalOrder()))
+        .thenComparing(TodoItem::getCreatedAt, Comparator.reverseOrder());
 
     private final TodoItemRepository todoItemRepository;
     private final TodoCategoryRepository categoryRepository;
@@ -74,6 +97,138 @@ public class TodoService {
         items.addAll(todoItemRepository.findByUserIdAndStatusAndDueStudyDayIsNull(userId, TodoItemStatus.OPEN));
         items.addAll(todoItemRepository.findByUserIdAndStatusAndDueStudyDayBefore(userId, TodoItemStatus.OPEN, today));
         return sortItems(items).stream().map(TodoItemResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TodoSearchResponse search(
+        Long userId,
+        String rawQuery,
+        String rawStatus,
+        Long categoryId,
+        Long tagId,
+        LocalDate dueFrom,
+        LocalDate dueTo,
+        Integer limit,
+        Long cursor
+    ) {
+        validateOptionalCategory(userId, categoryId);
+        validateOptionalTag(userId, tagId);
+
+        TodoItemStatus status = parseSearchStatus(rawStatus);
+        String query = normalizeSearchQuery(rawQuery);
+        int pageSize = resolveSearchLimit(limit);
+
+        List<TodoItem> matched = todoItemRepository.search(
+            userId,
+            query,
+            status,
+            categoryId,
+            tagId,
+            dueFrom,
+            dueTo
+        );
+        matched.sort(SEARCH_SORT);
+
+        int startIndex = 0;
+        if (cursor != null) {
+            for (int i = 0; i < matched.size(); i++) {
+                if (matched.get(i).getId().equals(cursor)) {
+                    startIndex = i + 1;
+                    break;
+                }
+            }
+        }
+
+        int endIndex = Math.min(startIndex + pageSize, matched.size());
+        List<TodoItemResponse> items = matched.subList(startIndex, endIndex).stream()
+            .map(TodoItemResponse::from)
+            .toList();
+        Long nextCursor = endIndex < matched.size() && !items.isEmpty()
+            ? items.get(items.size() - 1).todoId()
+            : null;
+
+        return new TodoSearchResponse(items, nextCursor, matched.size());
+    }
+
+    @Transactional(readOnly = true)
+    public TodoBoardResponse board(
+        Long userId,
+        LocalDate from,
+        LocalDate to,
+        Long categoryId,
+        Long tagId
+    ) {
+        validateDateRange(from, to);
+        validateOptionalCategory(userId, categoryId);
+        validateOptionalTag(userId, tagId);
+
+        List<TodoItem> openInRange = todoItemRepository.findByUserIdAndStatusAndDueStudyDayBetween(
+            userId,
+            TodoItemStatus.OPEN,
+            from,
+            to
+        ).stream()
+            .filter(item -> matchesBoardFilter(item, categoryId, tagId))
+            .toList();
+        Map<LocalDate, List<TodoItem>> openByDay = openInRange.stream()
+            .collect(Collectors.groupingBy(TodoItem::getDueStudyDay));
+
+        int summaryOpenCount = (int) todoItemRepository.findByUserIdAndStatus(userId, TodoItemStatus.OPEN).stream()
+            .filter(item -> matchesBoardFilter(item, categoryId, tagId))
+            .count();
+
+        List<StudySession> sessions = sessionRepository.findByUserIdAndStatusAndStudyDayBetween(
+            userId,
+            SessionStatus.CLOSED,
+            from,
+            to
+        );
+        Map<Long, TodoItem> todosById = loadTodosForSessions(sessions);
+
+        List<TodoBoardDayStats> days = new ArrayList<>();
+        int summaryCompleted = 0;
+        int summaryStudyMinutes = 0;
+
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            BoardDayAccumulator accumulator = new BoardDayAccumulator(day);
+
+            for (TodoItem item : loadDoneForDay(userId, day)) {
+                if (!matchesBoardFilter(item, categoryId, tagId)) {
+                    continue;
+                }
+                accumulator.addCompleted(item);
+            }
+
+            for (TodoItem item : openByDay.getOrDefault(day, List.of())) {
+                accumulator.addOpen(item);
+            }
+
+            for (StudySession session : sessions) {
+                if (!session.getStudyDay().equals(day)) {
+                    continue;
+                }
+                if (!sessionMatchesBoardFilter(session, todosById, categoryId, tagId)) {
+                    continue;
+                }
+                int minutes = session.getDurationMinutes() != null ? session.getDurationMinutes() : 0;
+                TodoItem linkedTodo = session.getTodoId() == null ? null : todosById.get(session.getTodoId());
+                accumulator.addStudyMinutes(linkedTodo, minutes);
+            }
+
+            if (accumulator.hasActivity()) {
+                days.add(accumulator.toResponse());
+                summaryCompleted += accumulator.completedCount;
+                summaryStudyMinutes += accumulator.studyMinutes;
+            }
+        }
+
+        TodoBoardSummary summary = new TodoBoardSummary(
+            summaryCompleted,
+            summaryOpenCount,
+            summaryStudyMinutes,
+            summaryStudyMinutes
+        );
+        return new TodoBoardResponse(from, to, summary, days);
     }
 
     @Transactional
@@ -439,6 +594,9 @@ public class TodoService {
         }
         if (clearEndTime) {
             newEnd = null;
+            if (endStudyDay == null) {
+                newEndDay = null;
+            }
         } else if (endTime != null) {
             newEnd = endTime;
         }
@@ -493,6 +651,232 @@ public class TodoService {
             throw new BadRequestException("INVALID_COLOR", "색상 코드 형식이 올바르지 않습니다.");
         }
         return trimmed;
+    }
+
+    private void validateDateRange(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "from과 to는 필수입니다.");
+        }
+        if (from.isAfter(to)) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "시작일은 종료일 이전이어야 합니다.");
+        }
+        if (ChronoUnit.DAYS.between(from, to) > MAX_BOARD_RANGE_DAYS) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "조회 기간은 최대 60일입니다.");
+        }
+    }
+
+    private void validateOptionalCategory(Long userId, Long categoryId) {
+        if (categoryId == null) {
+            return;
+        }
+        categoryRepository.findByIdAndUserId(categoryId, userId)
+            .orElseThrow(() -> new NotFoundException("CATEGORY_NOT_FOUND", "카테고리를 찾을 수 없습니다."));
+    }
+
+    private void validateOptionalTag(Long userId, Long tagId) {
+        if (tagId == null) {
+            return;
+        }
+        tagRepository.findByIdAndUserId(tagId, userId)
+            .orElseThrow(() -> new NotFoundException("TAG_NOT_FOUND", "태그를 찾을 수 없습니다."));
+    }
+
+    private TodoItemStatus parseSearchStatus(String rawStatus) {
+        if (!StringUtils.hasText(rawStatus) || "ALL".equalsIgnoreCase(rawStatus)) {
+            return null;
+        }
+        try {
+            return TodoItemStatus.valueOf(rawStatus.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("INVALID_STATUS", "status는 OPEN, DONE, ALL 중 하나여야 합니다.");
+        }
+    }
+
+    private String normalizeSearchQuery(String rawQuery) {
+        if (!StringUtils.hasText(rawQuery)) {
+            return null;
+        }
+        String trimmed = rawQuery.trim();
+        return StringUtils.hasText(trimmed) ? trimmed : null;
+    }
+
+    private int resolveSearchLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_SEARCH_LIMIT;
+        }
+        return Math.min(limit, MAX_SEARCH_LIMIT);
+    }
+
+    private boolean matchesBoardFilter(TodoItem item, Long categoryId, Long tagId) {
+        if (categoryId != null) {
+            if (item.getCategory() == null || !categoryId.equals(item.getCategory().getId())) {
+                return false;
+            }
+        }
+        if (tagId != null) {
+            return item.getTags().stream().anyMatch(tag -> tagId.equals(tag.getId()));
+        }
+        return true;
+    }
+
+    private boolean sessionMatchesBoardFilter(
+        StudySession session,
+        Map<Long, TodoItem> todosById,
+        Long categoryId,
+        Long tagId
+    ) {
+        if (categoryId == null && tagId == null) {
+            return true;
+        }
+        if (session.getTodoId() == null) {
+            return false;
+        }
+        TodoItem todo = todosById.get(session.getTodoId());
+        return todo != null && matchesBoardFilter(todo, categoryId, tagId);
+    }
+
+    private Map<Long, TodoItem> loadTodosForSessions(List<StudySession> sessions) {
+        Set<Long> todoIds = sessions.stream()
+            .map(StudySession::getTodoId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (todoIds.isEmpty()) {
+            return Map.of();
+        }
+        return todoItemRepository.findByIdIn(todoIds).stream()
+            .collect(Collectors.toMap(TodoItem::getId, Function.identity()));
+    }
+
+    private static final class BoardDayAccumulator {
+        private final LocalDate studyDay;
+        private int completedCount;
+        private int openCount;
+        private int studyMinutes;
+        private final Map<CategoryKey, CategoryStats> categories = new HashMap<>();
+        private final Map<Long, TagStats> tags = new HashMap<>();
+
+        private BoardDayAccumulator(LocalDate studyDay) {
+            this.studyDay = studyDay;
+        }
+
+        private void addCompleted(TodoItem item) {
+            completedCount++;
+            categoryOf(item).addCompleted();
+            for (TodoTag tag : item.getTags()) {
+                tags.computeIfAbsent(tag.getId(), id -> new TagStats(tag.getId(), tag.getName())).addCompleted();
+            }
+        }
+
+        private void addOpen(TodoItem item) {
+            openCount++;
+            categoryOf(item).addOpen();
+        }
+
+        private void addStudyMinutes(TodoItem item, int minutes) {
+            studyMinutes += minutes;
+            categoryOf(item).addStudyMinutes(minutes);
+            if (item != null) {
+                for (TodoTag tag : item.getTags()) {
+                    tags.computeIfAbsent(tag.getId(), id -> new TagStats(tag.getId(), tag.getName()))
+                        .addStudyMinutes(minutes);
+                }
+            }
+        }
+
+        private CategoryStats categoryOf(TodoItem item) {
+            TodoCategory category = item == null ? null : item.getCategory();
+            CategoryKey key = category == null
+                ? CategoryKey.uncategorized()
+                : new CategoryKey(category.getId(), category.getName(), category.getColor());
+            return categories.computeIfAbsent(key, CategoryStats::new);
+        }
+
+        private boolean hasActivity() {
+            return completedCount > 0 || openCount > 0 || studyMinutes > 0;
+        }
+
+        private TodoBoardDayStats toResponse() {
+            List<TodoBoardCategoryBreakdown> byCategory = categories.values().stream()
+                .map(CategoryStats::toResponse)
+                .sorted(Comparator.comparing(TodoBoardCategoryBreakdown::name))
+                .toList();
+            List<TodoBoardTagBreakdown> byTag = tags.values().stream()
+                .map(TagStats::toResponse)
+                .sorted(Comparator.comparing(TodoBoardTagBreakdown::name))
+                .toList();
+            return new TodoBoardDayStats(
+                studyDay,
+                completedCount,
+                openCount,
+                studyMinutes,
+                byCategory,
+                byTag
+            );
+        }
+    }
+
+    private record CategoryKey(Long categoryId, String name, String color) {
+        private static CategoryKey uncategorized() {
+            return new CategoryKey(null, UNCategorized, null);
+        }
+    }
+
+    private static final class CategoryStats {
+        private final CategoryKey key;
+        private int completedCount;
+        private int openCount;
+        private int studyMinutes;
+
+        private CategoryStats(CategoryKey key) {
+            this.key = key;
+        }
+
+        private void addCompleted() {
+            completedCount++;
+        }
+
+        private void addOpen() {
+            openCount++;
+        }
+
+        private void addStudyMinutes(int minutes) {
+            studyMinutes += minutes;
+        }
+
+        private TodoBoardCategoryBreakdown toResponse() {
+            return new TodoBoardCategoryBreakdown(
+                key.categoryId(),
+                key.name(),
+                key.color(),
+                completedCount,
+                openCount,
+                studyMinutes
+            );
+        }
+    }
+
+    private static final class TagStats {
+        private final Long tagId;
+        private final String name;
+        private int completedCount;
+        private int studyMinutes;
+
+        private TagStats(Long tagId, String name) {
+            this.tagId = tagId;
+            this.name = name;
+        }
+
+        private void addCompleted() {
+            completedCount++;
+        }
+
+        private void addStudyMinutes(int minutes) {
+            studyMinutes += minutes;
+        }
+
+        private TodoBoardTagBreakdown toResponse() {
+            return new TodoBoardTagBreakdown(tagId, name, completedCount, studyMinutes);
+        }
     }
 
     public record TodoDayView(

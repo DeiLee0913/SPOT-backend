@@ -136,6 +136,57 @@ public final class TodoDtos {
     ) {
     }
 
+    public record TodoSearchResponse(
+        List<TodoItemResponse> items,
+        Long nextCursor,
+        int total
+    ) {
+    }
+
+    public record TodoBoardCategoryBreakdown(
+        Long categoryId,
+        String name,
+        String color,
+        int completedCount,
+        int openCount,
+        int studyMinutes
+    ) {
+    }
+
+    public record TodoBoardTagBreakdown(
+        Long tagId,
+        String name,
+        int completedCount,
+        int studyMinutes
+    ) {
+    }
+
+    public record TodoBoardDayStats(
+        LocalDate studyDay,
+        int completedCount,
+        int openCount,
+        int studyMinutes,
+        List<TodoBoardCategoryBreakdown> byCategory,
+        List<TodoBoardTagBreakdown> byTag
+    ) {
+    }
+
+    public record TodoBoardSummary(
+        int completedCount,
+        int openCount,
+        int studyMinutes,
+        int studyMinutesFromSessions
+    ) {
+    }
+
+    public record TodoBoardResponse(
+        LocalDate from,
+        LocalDate to,
+        TodoBoardSummary summary,
+        List<TodoBoardDayStats> days
+    ) {
+    }
+
     public record LinkTodoRequest(Long todoId) {
     }
 }
