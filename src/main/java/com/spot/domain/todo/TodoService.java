@@ -91,6 +91,32 @@ public class TodoService {
 
     @Transactional(readOnly = true)
     public List<TodoItemResponse> listPickerForToday(Long userId) {
+        return listPickerForToday(userId, null);
+    }
+
+    /**
+     * 타이머·수동 세션용 todo 후보.
+     * {@code q}가 없으면 오늘+undated+outdated OPEN.
+     * {@code q}가 있으면 저장된 OPEN 전체에서 제목·설명·카테고리·태그 검색 (수동 세션 타입ahead).
+     */
+    @Transactional(readOnly = true)
+    public List<TodoItemResponse> listPickerForToday(Long userId, String rawQuery) {
+        String query = normalizeSearchQuery(rawQuery);
+        if (query != null) {
+            List<TodoItem> matched = todoItemRepository.search(
+                userId,
+                query,
+                TodoItemStatus.OPEN,
+                null,
+                null,
+                null,
+                null
+            );
+            matched.sort(SEARCH_SORT);
+            int limit = Math.min(matched.size(), DEFAULT_SEARCH_LIMIT);
+            return matched.subList(0, limit).stream().map(TodoItemResponse::from).toList();
+        }
+
         LocalDate today = studyDayService.currentStudyDay();
         List<TodoItem> items = new ArrayList<>();
         items.addAll(todoItemRepository.findByUserIdAndStatusAndStartDay(userId, TodoItemStatus.OPEN, today));
