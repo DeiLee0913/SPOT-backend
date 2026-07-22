@@ -55,10 +55,7 @@ public class GoalController {
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        var goals = goalService.getRange(currentUser.userId(), from, to).stream()
-            .map(GoalDayResponse::from)
-            .toList();
-        return ApiResponse.ok(new GoalRangeResponse(from, to, goals));
+        return ApiResponse.ok(GoalRangeResponse.from(goalService.getRange(currentUser.userId(), from, to)));
     }
 
     @PutMapping("/{studyDay}")
