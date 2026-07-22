@@ -17,13 +17,13 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
     Optional<TodoItem> findByIdAndUserId(Long id, Long userId);
 
     @EntityGraph(attributePaths = {"category", "tags"})
-    List<TodoItem> findByUserIdAndStatusAndDueStudyDay(Long userId, TodoItemStatus status, LocalDate dueStudyDay);
+    List<TodoItem> findByUserIdAndStatusAndStartDay(Long userId, TodoItemStatus status, LocalDate startDay);
 
     @EntityGraph(attributePaths = {"category", "tags"})
-    List<TodoItem> findByUserIdAndStatusAndDueStudyDayIsNull(Long userId, TodoItemStatus status);
+    List<TodoItem> findByUserIdAndStatusAndStartDayIsNull(Long userId, TodoItemStatus status);
 
     @EntityGraph(attributePaths = {"category", "tags"})
-    List<TodoItem> findByUserIdAndStatusAndDueStudyDayBefore(Long userId, TodoItemStatus status, LocalDate before);
+    List<TodoItem> findByUserIdAndStatusAndStartDayBefore(Long userId, TodoItemStatus status, LocalDate before);
 
     @EntityGraph(attributePaths = {"category", "tags"})
     @Query("""
@@ -31,8 +31,8 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
         where t.userId = :userId
           and t.status = com.spot.domain.todo.TodoItemStatus.DONE
           and (
-            t.dueStudyDay = :studyDay
-            or (t.dueStudyDay is null and t.doneAt >= :dayStart and t.doneAt < :dayEnd)
+            t.startDay = :studyDay
+            or (t.startDay is null and t.doneAt >= :dayStart and t.doneAt < :dayEnd)
           )
         """)
     List<TodoItem> findDoneForStudyDay(
@@ -46,7 +46,7 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
     List<TodoItem> findByUserIdAndStatus(Long userId, TodoItemStatus status);
 
     @EntityGraph(attributePaths = {"category", "tags"})
-    List<TodoItem> findByUserIdAndStatusAndDueStudyDayBetween(
+    List<TodoItem> findByUserIdAndStatusAndStartDayBetween(
         Long userId,
         TodoItemStatus status,
         LocalDate from,
@@ -63,11 +63,11 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
           and (:categoryId is null or c.id = :categoryId)
           and (:tagId is null or tag.id = :tagId)
           and (
-            (:dueFrom is null and :dueTo is null)
+            (:startFrom is null and :startTo is null)
             or (
-              t.dueStudyDay is not null
-              and (:dueFrom is null or t.dueStudyDay >= :dueFrom)
-              and (:dueTo is null or t.dueStudyDay <= :dueTo)
+              t.startDay is not null
+              and (:startFrom is null or t.startDay >= :startFrom)
+              and (:startTo is null or t.startDay <= :startTo)
             )
           )
           and (
@@ -84,8 +84,8 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
         @Param("status") TodoItemStatus status,
         @Param("categoryId") Long categoryId,
         @Param("tagId") Long tagId,
-        @Param("dueFrom") LocalDate dueFrom,
-        @Param("dueTo") LocalDate dueTo
+        @Param("startFrom") LocalDate startFrom,
+        @Param("startTo") LocalDate startTo
     );
 
     @EntityGraph(attributePaths = {"category", "tags"})

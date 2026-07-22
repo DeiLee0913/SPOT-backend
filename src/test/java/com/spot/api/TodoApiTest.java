@@ -69,7 +69,7 @@ class TodoApiTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.title", is("Review ch.3")))
             .andExpect(jsonPath("$.data.category").value(nullValue()))
-            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.startDay", is("2026-06-27")))
             .andReturn();
         long todoId = dataNode(quick).get("todoId").asLong();
 
@@ -127,7 +127,7 @@ class TodoApiTest {
 
         MvcResult created = mockMvc.perform(asUser(post("/todos"), token)
                 .content("""
-                    {"title":"API spec","categoryId":%d,"tagIds":[%d],"priority":1,"dueStudyDay":"2026-06-27"}
+                    {"title":"API spec","categoryId":%d,"tagIds":[%d],"priority":1,"startDay":"2026-06-27"}
                     """.formatted(categoryId, tagId)))
             .andExpect(status().isCreated())
             .andReturn();
@@ -171,7 +171,7 @@ class TodoApiTest {
 
         MvcResult created = mockMvc.perform(asUser(post("/todos"), token)
                 .content("""
-                    {"title":"Draft","categoryId":%d,"tagIds":[%d],"priority":1,"dueStudyDay":"2026-06-27"}
+                    {"title":"Draft","categoryId":%d,"tagIds":[%d],"priority":1,"startDay":"2026-06-27"}
                     """.formatted(categoryId, tagId1)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.success", is(true)))
@@ -186,15 +186,15 @@ class TodoApiTest {
                       "clearCategory": false,
                       "tagIds": [%d, %d],
                       "priority": 2,
-                      "dueStudyDay": "2026-06-30",
-                      "clearDue": false
+                      "startDay": "2026-06-30",
+                      "clearStartDay": false
                     }
                     """.formatted(categoryId, tagId1, tagId2)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success", is(true)))
             .andExpect(jsonPath("$.data.title", is("API spec")))
             .andExpect(jsonPath("$.data.priority", is(2)))
-            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-30")))
+            .andExpect(jsonPath("$.data.startDay", is("2026-06-30")))
             .andExpect(jsonPath("$.data.tags.length()", is(2)));
 
         mockMvc.perform(asUser(patch("/todos/" + todoId), token)
@@ -205,8 +205,8 @@ class TodoApiTest {
                       "clearCategory": true,
                       "tagIds": [],
                       "priority": null,
-                      "dueStudyDay": null,
-                      "clearDue": true
+                      "startDay": null,
+                      "clearStartDay": true
                     }
                     """))
             .andExpect(status().isOk())
@@ -214,7 +214,7 @@ class TodoApiTest {
             .andExpect(jsonPath("$.data.title", is("Undated")))
             .andExpect(jsonPath("$.data.category").value(nullValue()))
             .andExpect(jsonPath("$.data.priority").value(nullValue()))
-            .andExpect(jsonPath("$.data.dueStudyDay").value(nullValue()))
+            .andExpect(jsonPath("$.data.startDay").value(nullValue()))
             .andExpect(jsonPath("$.data.tags", hasSize(0)));
     }
 
@@ -236,7 +236,7 @@ class TodoApiTest {
 
         MvcResult todo = mockMvc.perform(asUser(post("/todos"), token)
                 .content("""
-                    {"title":"Tagged","categoryId":%d,"tagIds":[%d],"dueStudyDay":"2026-06-27"}
+                    {"title":"Tagged","categoryId":%d,"tagIds":[%d],"startDay":"2026-06-27"}
                     """.formatted(categoryId, tagId)))
             .andExpect(status().isCreated())
             .andReturn();
@@ -323,7 +323,7 @@ class TodoApiTest {
                       "categoryId": %d,
                       "tagIds": [%d],
                       "priority": 1,
-                      "dueStudyDay": "2026-06-27",
+                      "startDay": "2026-06-27",
                       "startTime": "10:00",
                       "endTime": "10:30"
                     }
@@ -340,7 +340,7 @@ class TodoApiTest {
             .andExpect(jsonPath("$.data.title", is("Standup_copy")))
             .andExpect(jsonPath("$.data.status", is("OPEN")))
             .andExpect(jsonPath("$.data.priority", is(1)))
-            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.startDay", is("2026-06-27")))
             .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
             .andExpect(jsonPath("$.data.endTime", is("10:30:00")))
             .andExpect(jsonPath("$.data.category.categoryId", is((int) categoryId)))
@@ -366,7 +366,7 @@ class TodoApiTest {
                     {
                       "title": "Project plan",
                       "description": "Prep notes\\n- [ ] Draft outline\\n- [x] Review slides",
-                      "dueStudyDay": "2026-06-27"
+                      "startDay": "2026-06-27"
                     }
                     """))
             .andExpect(status().isCreated())
@@ -401,7 +401,7 @@ class TodoApiTest {
                 .content("""
                     {
                       "title": "Team sync",
-                      "dueStudyDay": "2026-06-27",
+                      "startDay": "2026-06-27",
                       "startTime": "14:00",
                       "endTime": "15:30"
                     }
@@ -422,7 +422,7 @@ class TodoApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
             .andExpect(jsonPath("$.data.endTime").value(nullValue()))
-            .andExpect(jsonPath("$.data.endStudyDay").value(nullValue()));
+            .andExpect(jsonPath("$.data.endDay").value(nullValue()));
 
         mockMvc.perform(asUser(patch("/todos/" + todoId), token)
                 .content("""
@@ -443,13 +443,13 @@ class TodoApiTest {
                 .content("""
                     {
                       "title": "Multi-day block",
-                      "dueStudyDay": "2026-06-27",
-                      "endStudyDay": "2026-06-29"
+                      "startDay": "2026-06-27",
+                      "endDay": "2026-06-29"
                     }
                     """))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
-            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-29")))
+            .andExpect(jsonPath("$.data.startDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-29")))
             .andExpect(jsonPath("$.data.startTime").value(nullValue()))
             .andExpect(jsonPath("$.data.endTime").value(nullValue()));
     }
@@ -462,12 +462,12 @@ class TodoApiTest {
                 .content("""
                     {
                       "title": "Deadline",
-                      "dueStudyDay": "2026-06-27",
+                      "startDay": "2026-06-27",
                       "endTime": "18:00"
                     }
                     """))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-27")))
             .andExpect(jsonPath("$.data.endTime", is("18:00:00")));
     }
 
@@ -494,16 +494,16 @@ class TodoApiTest {
                 .content("""
                     {
                       "title": "Overnight workshop",
-                      "dueStudyDay": "2026-06-27",
+                      "startDay": "2026-06-27",
                       "startTime": "22:00",
-                      "endStudyDay": "2026-06-28",
+                      "endDay": "2026-06-28",
                       "endTime": "06:00"
                     }
                     """))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.dueStudyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.startDay", is("2026-06-27")))
             .andExpect(jsonPath("$.data.startTime", is("22:00:00")))
-            .andExpect(jsonPath("$.data.endStudyDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-28")))
             .andExpect(jsonPath("$.data.endTime", is("06:00:00")));
     }
 
@@ -554,7 +554,7 @@ class TodoApiTest {
                       "categoryId": %d,
                       "tagIds": [%d],
                       "priority": 1,
-                      "dueStudyDay": "2026-06-27"
+                      "startDay": "2026-06-27"
                     }
                     """.formatted(categoryId, tagId)))
             .andExpect(status().isCreated())
@@ -567,7 +567,7 @@ class TodoApiTest {
 
         MvcResult done = mockMvc.perform(asUser(post("/todos"), token)
                 .content("""
-                    {"title":"Done task","categoryId":%d,"dueStudyDay":"2026-06-26"}
+                    {"title":"Done task","categoryId":%d,"startDay":"2026-06-26"}
                     """.formatted(categoryId)))
             .andExpect(status().isCreated())
             .andReturn();
@@ -597,8 +597,8 @@ class TodoApiTest {
             .andExpect(jsonPath("$.data.items[0].tags[0].tagId", is((int) tagId)));
 
         mockMvc.perform(asUser(get("/todos/search"), token)
-                .param("dueFrom", "2026-06-27")
-                .param("dueTo", "2026-06-27"))
+                .param("startFrom", "2026-06-27")
+                .param("startTo", "2026-06-27"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total", is(1)))
             .andExpect(jsonPath("$.data.items[0].todoId", is((int) datedOpenId)))
@@ -644,7 +644,7 @@ class TodoApiTest {
                       "title": "Board task",
                       "categoryId": %d,
                       "tagIds": [%d],
-                      "dueStudyDay": "2026-06-27"
+                      "startDay": "2026-06-27"
                     }
                     """.formatted(categoryId, tagId)))
             .andExpect(status().isCreated())
