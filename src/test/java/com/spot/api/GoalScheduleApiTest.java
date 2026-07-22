@@ -2,7 +2,9 @@ package com.spot.api;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -71,7 +73,63 @@ class GoalScheduleApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.from", is("2026-06-27")))
             .andExpect(jsonPath("$.data.to", is("2026-06-30")))
-            .andExpect(jsonPath("$.data.goals", hasSize(2)));
+            .andExpect(jsonPath("$.data.goals", hasSize(2)))
+            .andExpect(jsonPath("$.data.days", hasSize(4)))
+            .andExpect(jsonPath("$.data.days[0].studyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.days[0].goalMinutes").value(nullValue()))
+            .andExpect(jsonPath("$.data.days[0].actualMinutes", is(0)))
+            .andExpect(jsonPath("$.data.days[1].studyDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.days[1].goalMinutes", is(90)))
+            .andExpect(jsonPath("$.data.days[1].actualMinutes", is(0)));
+    }
+
+    @Test
+    void rangeIncludesClosedSessionActualMinutesPerStudyDay() throws Exception {
+        String token = newUserToken("실적");
+
+        mockMvc.perform(asUser(put("/goals/2026-06-28"), token)
+                .content("{\"goalMinutes\":90}"))
+            .andExpect(status().isOk());
+
+        // study day 2026-06-26 (past): two CLOSED manuals → 45+15=60
+        mockMvc.perform(asUser(post("/sessions/manual"), token)
+                .content("""
+                    {
+                      "title":"A",
+                      "startedAt":"2026-06-26T01:00:00Z",
+                      "endedAt":"2026-06-26T01:45:00Z"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+        mockMvc.perform(asUser(post("/sessions/manual"), token)
+                .content("""
+                    {
+                      "title":"B",
+                      "startedAt":"2026-06-26T02:00:00Z",
+                      "endedAt":"2026-06-26T02:15:00Z"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        // OPEN timer on today must not count toward actualMinutes
+        mockMvc.perform(asUser(post("/sessions/start"), token)
+                .content("{\"title\":\"Live\"}"))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(get("/goals/range").param("from", "2026-06-26").param("to", "2026-06-28"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.days", hasSize(3)))
+            .andExpect(jsonPath("$.data.days[0].studyDay", is("2026-06-26")))
+            .andExpect(jsonPath("$.data.days[0].goalMinutes").value(nullValue()))
+            .andExpect(jsonPath("$.data.days[0].actualMinutes", is(60)))
+            .andExpect(jsonPath("$.data.days[1].studyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.days[1].actualMinutes", is(0)))
+            .andExpect(jsonPath("$.data.days[2].studyDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.days[2].goalMinutes", is(90)))
+            .andExpect(jsonPath("$.data.days[2].actualMinutes", is(0)))
+            .andExpect(jsonPath("$.data.goals", hasSize(1)))
+            .andExpect(jsonPath("$.data.goals[0].studyDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.goals[0].actualMinutes", is(0)));
     }
 
     @Test

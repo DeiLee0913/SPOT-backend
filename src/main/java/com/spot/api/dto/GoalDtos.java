@@ -1,5 +1,6 @@
 package com.spot.api.dto;
 
+import com.spot.domain.goal.GoalService.GoalRangeView;
 import com.spot.domain.goal.GoalService.TodayGoalView;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -37,21 +38,55 @@ public final class GoalDtos {
     public record GoalDayResponse(
         LocalDate studyDay,
         int goalMinutes,
-        String source
+        String source,
+        int actualMinutes
     ) {
         public static GoalDayResponse from(com.spot.domain.goal.DailyGoal goal) {
+            return from(goal, 0);
+        }
+
+        public static GoalDayResponse from(com.spot.domain.goal.DailyGoal goal, int actualMinutes) {
             return new GoalDayResponse(
                 goal.getStudyDay(),
                 goal.getGoalMinutes(),
-                goal.getSource().name()
+                goal.getSource().name(),
+                actualMinutes
             );
+        }
+
+        public static GoalDayResponse from(GoalRangeView.StoredGoalDay day) {
+            return new GoalDayResponse(
+                day.studyDay(),
+                day.goalMinutes(),
+                day.source().name(),
+                day.actualMinutes()
+            );
+        }
+    }
+
+    public record GoalRangeDayResponse(
+        LocalDate studyDay,
+        Integer goalMinutes,
+        int actualMinutes
+    ) {
+        public static GoalRangeDayResponse from(GoalRangeView.RangeDay day) {
+            return new GoalRangeDayResponse(day.studyDay(), day.goalMinutes(), day.actualMinutes());
         }
     }
 
     public record GoalRangeResponse(
         LocalDate from,
         LocalDate to,
-        List<GoalDayResponse> goals
+        List<GoalDayResponse> goals,
+        List<GoalRangeDayResponse> days
     ) {
+        public static GoalRangeResponse from(GoalRangeView view) {
+            return new GoalRangeResponse(
+                view.from(),
+                view.to(),
+                view.goals().stream().map(GoalDayResponse::from).toList(),
+                view.days().stream().map(GoalRangeDayResponse::from).toList()
+            );
+        }
     }
 }

@@ -13,9 +13,13 @@ import com.spot.domain.user.UserStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,15 +112,54 @@ public class GoalService {
         return upsertUserGoal(userId, studyDay, goalMinutes);
     }
 
+    /**
+     * 기간별 저장된 일일 목표 + study day별 CLOSED 세션 합({@code actualMinutes}).
+     * {@code days}는 from~to 모든 날짜를 포함하며, 목표 행이 없으면 {@code goalMinutes}는 null.
+     */
     @Transactional(readOnly = true)
-    public List<DailyGoal> getRange(Long userId, LocalDate from, LocalDate to) {
+    public GoalRangeView getRange(Long userId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
             throw new BadRequestException("INVALID_DATE_RANGE", "시작일은 종료일 이전이어야 합니다.");
         }
         if (ChronoUnit.DAYS.between(from, to) > 60) {
             throw new BadRequestException("INVALID_DATE_RANGE", "조회 기간은 최대 60일입니다.");
         }
-        return dailyGoalRepository.findByUserIdAndStudyDayBetween(userId, from, to);
+
+        List<DailyGoal> storedGoals = dailyGoalRepository.findByUserIdAndStudyDayBetween(userId, from, to);
+        Map<LocalDate, DailyGoal> goalByDay = storedGoals.stream()
+            .collect(Collectors.toMap(DailyGoal::getStudyDay, Function.identity()));
+
+        Map<LocalDate, Integer> actualByDay = new HashMap<>();
+        for (StudySession session : studySessionRepository.findByUserIdAndStatusAndStudyDayBetween(
+            userId,
+            SessionStatus.CLOSED,
+            from,
+            to
+        )) {
+            int minutes = session.getDurationMinutes() == null ? 0 : session.getDurationMinutes();
+            actualByDay.merge(session.getStudyDay(), minutes, Integer::sum);
+        }
+
+        List<GoalRangeView.StoredGoalDay> goals = storedGoals.stream()
+            .map(goal -> new GoalRangeView.StoredGoalDay(
+                goal.getStudyDay(),
+                goal.getGoalMinutes(),
+                goal.getSource(),
+                actualByDay.getOrDefault(goal.getStudyDay(), 0)
+            ))
+            .toList();
+
+        List<GoalRangeView.RangeDay> days = new ArrayList<>();
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            DailyGoal goal = goalByDay.get(day);
+            days.add(new GoalRangeView.RangeDay(
+                day,
+                goal == null ? null : goal.getGoalMinutes(),
+                actualByDay.getOrDefault(day, 0)
+            ));
+        }
+
+        return new GoalRangeView(from, to, goals, days);
     }
 
     private DailyGoal upsertUserGoal(Long userId, LocalDate studyDay, int goalMinutes) {
@@ -221,5 +264,27 @@ public class GoalService {
     }
 
     public record TodayGoalView(LocalDate studyDay, Integer goalMinutes, GoalSource source, boolean deadlineApplied) {
+    }
+
+    public record GoalRangeView(
+        LocalDate from,
+        LocalDate to,
+        List<StoredGoalDay> goals,
+        List<RangeDay> days
+    ) {
+        public record StoredGoalDay(
+            LocalDate studyDay,
+            int goalMinutes,
+            GoalSource source,
+            int actualMinutes
+        ) {
+        }
+
+        public record RangeDay(
+            LocalDate studyDay,
+            Integer goalMinutes,
+            int actualMinutes
+        ) {
+        }
     }
 }
