@@ -36,6 +36,11 @@ $backendToFront = @(
     "KEEPALIVE.md"
 )
 
+# docs/shared 전용 요청·메모 → front/docs (덮어쓰지 않는 단방향 복사)
+$sharedOnlyToFront = @(
+    "requests_260722ver.md"
+)
+
 $copied = @()
 
 foreach ($file in $sharedFiles) {
@@ -59,6 +64,16 @@ foreach ($file in $backendToFront) {
     $copied += $file
 }
 
+foreach ($file in $sharedOnlyToFront) {
+    $src = Join-Path $sharedDest $file
+    if (-not (Test-Path $src)) {
+        Write-Warning "Skip missing shared-only doc: $file"
+        continue
+    }
+    Copy-Item $src (Join-Path $frontDocs $file) -Force
+    $copied += $file
+}
+
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss K"
 $manifest = @"
 # Sync manifest (auto-generated)
@@ -67,6 +82,7 @@ $manifest = @"
 - **Last sync:** $timestamp
 - **Shared files:** $($sharedFiles -join ', ')
 - **Also synced to front:** $($backendToFront -join ', ')
+- **Shared-only to front:** $($sharedOnlyToFront -join ', ')
 
 Run from backend repo:
 
