@@ -1,5 +1,6 @@
 package com.spot.domain.todo;
 
+import com.spot.api.dto.TodoDtos.BatchPatchRequest;
 import com.spot.api.dto.TodoDtos.TodoBoardCategoryBreakdown;
 import com.spot.api.dto.TodoDtos.TodoBoardDayStats;
 import com.spot.api.dto.TodoDtos.TodoBoardResponse;
@@ -42,6 +43,7 @@ public class TodoService {
     private static final int DEFAULT_SEARCH_LIMIT = 50;
     private static final int MAX_SEARCH_LIMIT = 100;
     private static final int MAX_BOARD_RANGE_DAYS = 60;
+    private static final int MAX_BATCH_SIZE = 50;
     private static final String DEFAULT_CATEGORY_COLOR = "#64748B";
     private static final String UNCategorized = "Uncategorized";
     private static final Comparator<TodoItem> SEARCH_SORT = Comparator
@@ -105,12 +107,26 @@ public class TodoService {
         String rawQuery,
         String rawStatus,
         Long categoryId,
+        boolean uncategorized,
         Long tagId,
+        boolean untagged,
         LocalDate startFrom,
         LocalDate startTo,
         Integer limit,
         Long cursor
     ) {
+        if (uncategorized && categoryId != null) {
+            throw new BadRequestException(
+                "INVALID_SEARCH_FILTER",
+                "uncategorized와 categoryId는 함께 사용할 수 없습니다."
+            );
+        }
+        if (untagged && tagId != null) {
+            throw new BadRequestException(
+                "INVALID_SEARCH_FILTER",
+                "untagged와 tagId는 함께 사용할 수 없습니다."
+            );
+        }
         validateOptionalCategory(userId, categoryId);
         validateOptionalTag(userId, tagId);
 
@@ -123,7 +139,9 @@ public class TodoService {
             query,
             status,
             categoryId,
+            uncategorized,
             tagId,
+            untagged,
             startFrom,
             startTo
         );
@@ -326,6 +344,91 @@ public class TodoService {
             item.setPriority(priority);
         }
         return getOwned(userId, todoId);
+    }
+
+    @Transactional
+    public TodoItem applyBatchPatch(Long userId, Long todoId, BatchPatchRequest patch) {
+        if (patch == null) {
+            throw new BadRequestException("PATCH_REQUIRED", "PATCH 액션에는 patch 본문이 필요합니다.");
+        }
+        List<Long> resolvedTagIds = resolveBatchTagIds(userId, todoId, patch);
+        return update(
+            userId,
+            todoId,
+            patch.title(),
+            patch.description(),
+            patch.categoryId(),
+            resolvedTagIds,
+            patch.priority(),
+            patch.startDay(),
+            Boolean.TRUE.equals(patch.clearCategory()),
+            Boolean.TRUE.equals(patch.clearStartDay()),
+            patch.startTime(),
+            patch.endTime(),
+            patch.endDay(),
+            Boolean.TRUE.equals(patch.clearStartTime()),
+            Boolean.TRUE.equals(patch.clearEndTime()),
+            Boolean.TRUE.equals(patch.clearEndDay()),
+            Boolean.TRUE.equals(patch.clearDescription())
+        );
+    }
+
+    public void validateBatchRequest(List<Long> todoIds, String rawAction, BatchPatchRequest patch) {
+        if (todoIds == null || todoIds.isEmpty()) {
+            throw new BadRequestException("TODO_IDS_REQUIRED", "todoIds는 필수입니다.");
+        }
+        if (todoIds.size() > MAX_BATCH_SIZE) {
+            throw new BadRequestException("BATCH_TOO_LARGE", "한 번에 최대 " + MAX_BATCH_SIZE + "개까지 처리할 수 있습니다.");
+        }
+        String action = normalizeBatchAction(rawAction);
+        if ("PATCH".equals(action) && patch == null) {
+            throw new BadRequestException("PATCH_REQUIRED", "PATCH 액션에는 patch 본문이 필요합니다.");
+        }
+        if (!"PATCH".equals(action) && patch != null) {
+            throw new BadRequestException("PATCH_NOT_ALLOWED", action + " 액션에는 patch를 사용할 수 없습니다.");
+        }
+    }
+
+    public String normalizeBatchAction(String rawAction) {
+        if (!StringUtils.hasText(rawAction)) {
+            throw new BadRequestException("ACTION_REQUIRED", "action은 필수입니다.");
+        }
+        String action = rawAction.trim().toUpperCase();
+        return switch (action) {
+            case "PATCH", "DELETE", "COMPLETE", "REOPEN", "RESCHEDULE_TODAY", "DUPLICATE" -> action;
+            default -> throw new BadRequestException(
+                "INVALID_ACTION",
+                "action은 PATCH, DELETE, COMPLETE, REOPEN, RESCHEDULE_TODAY, DUPLICATE 중 하나여야 합니다."
+            );
+        };
+    }
+
+    private List<Long> resolveBatchTagIds(Long userId, Long todoId, BatchPatchRequest patch) {
+        boolean hasAdd = patch.addTagIds() != null;
+        boolean hasRemove = patch.removeTagIds() != null;
+        if (patch.tagIds() != null && (hasAdd || hasRemove)) {
+            throw new BadRequestException(
+                "INVALID_TAG_PATCH",
+                "tagIds와 addTagIds/removeTagIds는 함께 사용할 수 없습니다."
+            );
+        }
+        if (patch.tagIds() != null) {
+            return patch.tagIds();
+        }
+        if (!hasAdd && !hasRemove) {
+            return null;
+        }
+        TodoItem item = getOwned(userId, todoId);
+        Set<Long> next = item.getTags().stream()
+            .map(TodoTag::getId)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (hasRemove) {
+            next.removeAll(patch.removeTagIds());
+        }
+        if (hasAdd) {
+            next.addAll(patch.addTagIds());
+        }
+        return List.copyOf(next);
     }
 
     @Transactional

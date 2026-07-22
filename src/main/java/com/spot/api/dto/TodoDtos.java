@@ -53,6 +53,43 @@ public final class TodoDtos {
     ) {
     }
 
+    public record BatchTodoRequest(
+        List<Long> todoIds,
+        @NotBlank String action,
+        BatchPatchRequest patch
+    ) {
+    }
+
+    public record BatchPatchRequest(
+        Long categoryId,
+        Boolean clearCategory,
+        List<Long> tagIds,
+        List<Long> addTagIds,
+        List<Long> removeTagIds,
+        String title,
+        String description,
+        Boolean clearDescription,
+        @Min(1) @Max(4) Integer priority,
+        LocalDate startDay,
+        Boolean clearStartDay,
+        LocalTime startTime,
+        LocalTime endTime,
+        LocalDate endDay,
+        Boolean clearStartTime,
+        Boolean clearEndTime,
+        Boolean clearEndDay
+    ) {
+    }
+
+    public record BatchTodoFailure(Long todoId, String code, String message) {
+    }
+
+    public record BatchTodoResponse(
+        List<Long> succeeded,
+        List<BatchTodoFailure> failed
+    ) {
+    }
+
     public record CreateCategoryRequest(
         @NotBlank String name,
         String color
