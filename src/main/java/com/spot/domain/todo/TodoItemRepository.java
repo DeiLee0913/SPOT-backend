@@ -60,7 +60,9 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
         left join t.tags tag
         where t.userId = :userId
           and (:status is null or t.status = :status)
+          and (:uncategorized = false or t.category is null)
           and (:categoryId is null or c.id = :categoryId)
+          and (:untagged = false or t.tags is empty)
           and (:tagId is null or tag.id = :tagId)
           and (
             (:startFrom is null and :startTo is null)
@@ -83,7 +85,9 @@ public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
         @Param("q") String q,
         @Param("status") TodoItemStatus status,
         @Param("categoryId") Long categoryId,
+        @Param("uncategorized") boolean uncategorized,
         @Param("tagId") Long tagId,
+        @Param("untagged") boolean untagged,
         @Param("startFrom") LocalDate startFrom,
         @Param("startTo") LocalDate startTo
     );

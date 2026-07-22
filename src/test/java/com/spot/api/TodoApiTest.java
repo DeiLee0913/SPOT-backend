@@ -701,6 +701,125 @@ class TodoApiTest {
             .andExpect(jsonPath("$.error.code", is("INVALID_DATE_RANGE")));
     }
 
+    @Test
+    void searchUncategorizedAndUntagged() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Spring\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"work\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId = dataNode(tag).get("tagId").asLong();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {"title":"Categorized","categoryId":%d,"tagIds":[%d],"startDay":"2026-06-27"}
+                    """.formatted(categoryId, tagId)))
+            .andExpect(status().isCreated());
+
+        MvcResult bare = mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"Bare item\",\"startDay\":\"2026-06-27\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long bareId = dataNode(bare).get("todoId").asLong();
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("uncategorized", "true")
+                .param("status", "OPEN"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items[0].todoId", is((int) bareId)))
+            .andExpect(jsonPath("$.data.items[0].category").value(nullValue()));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("untagged", "true")
+                .param("status", "OPEN"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items[0].todoId", is((int) bareId)))
+            .andExpect(jsonPath("$.data.items[0].tags", hasSize(0)));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("uncategorized", "true")
+                .param("categoryId", String.valueOf(categoryId)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code", is("INVALID_SEARCH_FILTER")));
+    }
+
+    @Test
+    void batchPatchAddTagsAndPartialFailure() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Spring\",\"color\":\"#3B82F6\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        MvcResult tag = mockMvc.perform(asUser(post("/todos/tags"), token)
+                .content("{\"name\":\"work\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long tagId = dataNode(tag).get("tagId").asLong();
+
+        MvcResult first = mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"One\",\"startDay\":\"2026-06-27\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long firstId = dataNode(first).get("todoId").asLong();
+
+        MvcResult second = mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"Two\",\"startDay\":\"2026-06-27\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long secondId = dataNode(second).get("todoId").asLong();
+
+        mockMvc.perform(asUser(post("/todos/batch"), token)
+                .content("""
+                    {
+                      "todoIds": [%d, %d, 999999],
+                      "action": "PATCH",
+                      "patch": {
+                        "categoryId": %d,
+                        "addTagIds": [%d]
+                      }
+                    }
+                    """.formatted(firstId, secondId, categoryId, tagId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.succeeded.length()", is(2)))
+            .andExpect(jsonPath("$.data.failed.length()", is(1)))
+            .andExpect(jsonPath("$.data.failed[0].todoId", is(999999)))
+            .andExpect(jsonPath("$.data.failed[0].code", is("TODO_NOT_FOUND")));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("categoryId", String.valueOf(categoryId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(2)));
+
+        mockMvc.perform(asUser(post("/todos/batch"), token)
+                .content("""
+                    {
+                      "todoIds": [%d],
+                      "action": "COMPLETE"
+                    }
+                    """.formatted(firstId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.succeeded[0]", is((int) firstId)));
+
+        mockMvc.perform(asUser(get("/todos/search"), token)
+                .param("status", "DONE")
+                .param("categoryId", String.valueOf(categoryId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total", is(1)))
+            .andExpect(jsonPath("$.data.items[0].todoId", is((int) firstId)));
+    }
+
     private String newUserToken() {
         User user = userRepository.save(User.ofSocial(
             AuthProvider.NAVER,

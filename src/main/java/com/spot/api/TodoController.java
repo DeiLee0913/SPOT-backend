@@ -1,5 +1,8 @@
 package com.spot.api;
 
+import com.spot.api.dto.TodoDtos.BatchTodoFailure;
+import com.spot.api.dto.TodoDtos.BatchTodoRequest;
+import com.spot.api.dto.TodoDtos.BatchTodoResponse;
 import com.spot.api.dto.TodoDtos.CategoryResponse;
 import com.spot.api.dto.TodoDtos.CreateCategoryRequest;
 import com.spot.api.dto.TodoDtos.CreateTagRequest;
@@ -15,6 +18,7 @@ import com.spot.api.dto.TodoDtos.UpdateTagRequest;
 import com.spot.api.dto.TodoDtos.UpdateTodoRequest;
 import com.spot.auth.AuthenticatedUser;
 import com.spot.auth.CurrentUser;
+import com.spot.common.ApiException;
 import com.spot.common.ApiResponse;
 import com.spot.common.StudyDayService;
 import com.spot.domain.todo.TodoCategory;
@@ -24,6 +28,7 @@ import com.spot.domain.todo.TodoService.TodoDayView;
 import com.spot.domain.todo.TodoTag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -71,7 +76,9 @@ public class TodoController {
         @RequestParam(required = false) String q,
         @RequestParam(required = false, defaultValue = "ALL") String status,
         @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false, defaultValue = "false") boolean uncategorized,
         @RequestParam(required = false) Long tagId,
+        @RequestParam(required = false, defaultValue = "false") boolean untagged,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startFrom,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startTo,
         @RequestParam(required = false) Integer limit,
@@ -82,7 +89,9 @@ public class TodoController {
             q,
             status,
             categoryId,
+            uncategorized,
             tagId,
+            untagged,
             startFrom,
             startTo,
             limit,
@@ -105,6 +114,42 @@ public class TodoController {
             categoryId,
             tagId
         ));
+    }
+
+    @PostMapping("/batch")
+    public ApiResponse<BatchTodoResponse> batch(
+        @CurrentUser AuthenticatedUser currentUser,
+        @Valid @RequestBody BatchTodoRequest request
+    ) {
+        todoService.validateBatchRequest(request.todoIds(), request.action(), request.patch());
+        String action = todoService.normalizeBatchAction(request.action());
+        Long userId = currentUser.userId();
+
+        List<Long> succeeded = new ArrayList<>();
+        List<BatchTodoFailure> failed = new ArrayList<>();
+
+        for (Long todoId : request.todoIds()) {
+            if (todoId == null) {
+                failed.add(new BatchTodoFailure(null, "TODO_ID_REQUIRED", "todoId가 필요합니다."));
+                continue;
+            }
+            try {
+                switch (action) {
+                    case "PATCH" -> todoService.applyBatchPatch(userId, todoId, request.patch());
+                    case "DELETE" -> todoService.delete(userId, todoId);
+                    case "COMPLETE" -> todoService.complete(userId, todoId);
+                    case "REOPEN" -> todoService.reopen(userId, todoId);
+                    case "RESCHEDULE_TODAY" -> todoService.rescheduleToday(userId, todoId);
+                    case "DUPLICATE" -> todoService.duplicate(userId, todoId);
+                    default -> throw new IllegalStateException("Unexpected action: " + action);
+                }
+                succeeded.add(todoId);
+            } catch (ApiException ex) {
+                failed.add(new BatchTodoFailure(todoId, ex.getCode(), ex.getMessage()));
+            }
+        }
+
+        return ApiResponse.ok(new BatchTodoResponse(succeeded, failed));
     }
 
     @PostMapping("/quick")
