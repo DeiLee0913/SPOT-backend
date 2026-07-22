@@ -99,6 +99,38 @@ class TodoApiTest {
     }
 
     @Test
+    void pickerQuerySearchesSavedOpenTodosIncludingFuture() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"Spring Boot notes\",\"startDay\":\"2026-06-27\"}"))
+            .andExpect(status().isCreated());
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"Future Spring lab\",\"startDay\":\"2026-07-05\"}"))
+            .andExpect(status().isCreated());
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("{\"title\":\"Unrelated math\",\"startDay\":\"2026-06-27\"}"))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(get("/todos/picker"), token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(2)));
+
+        mockMvc.perform(asUser(get("/todos/picker"), token).param("q", "Spring"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(2)))
+            .andExpect(jsonPath("$.data[*].title", org.hamcrest.Matchers.containsInAnyOrder(
+                "Spring Boot notes",
+                "Future Spring lab"
+            )));
+
+        mockMvc.perform(asUser(get("/todos/picker"), token).param("q", "math"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()", is(1)))
+            .andExpect(jsonPath("$.data[0].title", is("Unrelated math")));
+    }
+
+    @Test
     void startWithoutTodoOrTitleAllowed() throws Exception {
         String token = newUserToken();
 

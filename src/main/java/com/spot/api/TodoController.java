@@ -61,8 +61,11 @@ public class TodoController {
     }
 
     @GetMapping("/picker")
-    public ApiResponse<List<TodoItemResponse>> picker(@CurrentUser AuthenticatedUser currentUser) {
-        return ApiResponse.ok(todoService.listPickerForToday(currentUser.userId()));
+    public ApiResponse<List<TodoItemResponse>> picker(
+        @CurrentUser AuthenticatedUser currentUser,
+        @RequestParam(required = false) String q
+    ) {
+        return ApiResponse.ok(todoService.listPickerForToday(currentUser.userId(), q));
     }
 
     @GetMapping("/search")
