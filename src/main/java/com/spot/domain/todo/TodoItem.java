@@ -42,8 +42,8 @@ public class TodoItem {
     @Column(columnDefinition = "text")
     private String description;
 
-    @Column(name = "due_study_day")
-    private LocalDate dueStudyDay;
+    @Column(name = "start_day")
+    private LocalDate startDay;
 
     @Column(name = "start_time")
     private LocalTime startTime;
@@ -51,8 +51,8 @@ public class TodoItem {
     @Column(name = "end_time")
     private LocalTime endTime;
 
-    @Column(name = "end_study_day")
-    private LocalDate endStudyDay;
+    @Column(name = "end_day")
+    private LocalDate endDay;
 
     @Column
     private Integer priority;
@@ -81,10 +81,10 @@ public class TodoItem {
     protected TodoItem() {
     }
 
-    public TodoItem(Long userId, String title, LocalDate dueStudyDay) {
+    public TodoItem(Long userId, String title, LocalDate startDay) {
         this.userId = userId;
         this.title = title;
-        this.dueStudyDay = dueStudyDay;
+        this.startDay = startDay;
         this.status = TodoItemStatus.OPEN;
     }
 
@@ -111,7 +111,7 @@ public class TodoItem {
     }
 
     public void rescheduleTo(LocalDate studyDay) {
-        this.dueStudyDay = studyDay;
+        this.startDay = studyDay;
     }
 
     public void assignCategory(TodoCategory category) {
@@ -151,12 +151,12 @@ public class TodoItem {
         this.description = description;
     }
 
-    public LocalDate getDueStudyDay() {
-        return dueStudyDay;
+    public LocalDate getStartDay() {
+        return startDay;
     }
 
-    public void setDueStudyDay(LocalDate dueStudyDay) {
-        this.dueStudyDay = dueStudyDay;
+    public void setStartDay(LocalDate startDay) {
+        this.startDay = startDay;
     }
 
     public LocalTime getStartTime() {
@@ -175,12 +175,12 @@ public class TodoItem {
         this.endTime = endTime;
     }
 
-    public LocalDate getEndStudyDay() {
-        return endStudyDay;
+    public LocalDate getEndDay() {
+        return endDay;
     }
 
-    public void setEndStudyDay(LocalDate endStudyDay) {
-        this.endStudyDay = endStudyDay;
+    public void setEndDay(LocalDate endDay) {
+        this.endDay = endDay;
     }
 
     public Integer getPriority() {

@@ -72,8 +72,8 @@ public class TodoController {
         @RequestParam(required = false, defaultValue = "ALL") String status,
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) Long tagId,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueFrom,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueTo,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startTo,
         @RequestParam(required = false) Integer limit,
         @RequestParam(required = false) Long cursor
     ) {
@@ -83,8 +83,8 @@ public class TodoController {
             status,
             categoryId,
             tagId,
-            dueFrom,
-            dueTo,
+            startFrom,
+            startTo,
             limit,
             cursor
         ));
@@ -130,10 +130,10 @@ public class TodoController {
             request.categoryId(),
             request.tagIds(),
             request.priority(),
-            request.dueStudyDay(),
+            request.startDay(),
             request.startTime(),
             request.endTime(),
-            request.endStudyDay()
+            request.endDay()
         );
         return ApiResponse.ok(TodoItemResponse.from(item));
     }
@@ -152,15 +152,15 @@ public class TodoController {
             request.categoryId(),
             request.tagIds(),
             request.priority(),
-            request.dueStudyDay(),
+            request.startDay(),
             Boolean.TRUE.equals(request.clearCategory()),
-            Boolean.TRUE.equals(request.clearDue()),
+            Boolean.TRUE.equals(request.clearStartDay()),
             request.startTime(),
             request.endTime(),
-            request.endStudyDay(),
+            request.endDay(),
             Boolean.TRUE.equals(request.clearStartTime()),
             Boolean.TRUE.equals(request.clearEndTime()),
-            Boolean.TRUE.equals(request.clearEndStudyDay()),
+            Boolean.TRUE.equals(request.clearEndDay()),
             Boolean.TRUE.equals(request.clearDescription())
         );
         return ApiResponse.ok(TodoItemResponse.from(item));

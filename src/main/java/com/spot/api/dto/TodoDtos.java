@@ -27,10 +27,10 @@ public final class TodoDtos {
         Long categoryId,
         List<Long> tagIds,
         @Min(1) @Max(4) Integer priority,
-        LocalDate dueStudyDay,
+        LocalDate startDay,
         LocalTime startTime,
         LocalTime endTime,
-        LocalDate endStudyDay
+        LocalDate endDay
     ) {
     }
 
@@ -42,14 +42,14 @@ public final class TodoDtos {
         Boolean clearCategory,
         List<Long> tagIds,
         @Min(1) @Max(4) Integer priority,
-        LocalDate dueStudyDay,
-        Boolean clearDue,
+        LocalDate startDay,
+        Boolean clearStartDay,
         LocalTime startTime,
         LocalTime endTime,
-        LocalDate endStudyDay,
+        LocalDate endDay,
         Boolean clearStartTime,
         Boolean clearEndTime,
-        Boolean clearEndStudyDay
+        Boolean clearEndDay
     ) {
     }
 
@@ -94,10 +94,10 @@ public final class TodoDtos {
         CategoryResponse category,
         List<TagResponse> tags,
         Integer priority,
-        LocalDate dueStudyDay,
+        LocalDate startDay,
         LocalTime startTime,
         LocalTime endTime,
-        LocalDate endStudyDay,
+        LocalDate endDay,
         String status,
         Instant doneAt,
         Instant createdAt
@@ -116,10 +116,10 @@ public final class TodoDtos {
                 category,
                 tags,
                 item.getPriority(),
-                item.getDueStudyDay(),
+                item.getStartDay(),
                 item.getStartTime(),
                 item.getEndTime(),
-                item.getEndStudyDay(),
+                item.getEndDay(),
                 item.getStatus().name(),
                 item.getDoneAt(),
                 item.getCreatedAt()

@@ -47,7 +47,7 @@ public class TodoService {
     private static final Comparator<TodoItem> SEARCH_SORT = Comparator
         .comparing((TodoItem item) -> item.getStatus() == TodoItemStatus.DONE)
         .thenComparing(TodoItem::getPriority, Comparator.nullsLast(Comparator.naturalOrder()))
-        .thenComparing(TodoItem::getDueStudyDay, Comparator.nullsLast(Comparator.naturalOrder()))
+        .thenComparing(TodoItem::getStartDay, Comparator.nullsLast(Comparator.naturalOrder()))
         .thenComparing(TodoItem::getCreatedAt, Comparator.reverseOrder());
 
     private final TodoItemRepository todoItemRepository;
@@ -73,11 +73,11 @@ public class TodoService {
     @Transactional(readOnly = true)
     public TodoDayView listForStudyDay(Long userId, LocalDate studyDay) {
         List<TodoItem> today = sortItems(
-            todoItemRepository.findByUserIdAndStatusAndDueStudyDay(userId, TodoItemStatus.OPEN, studyDay));
+            todoItemRepository.findByUserIdAndStatusAndStartDay(userId, TodoItemStatus.OPEN, studyDay));
         List<TodoItem> undated = sortItems(
-            todoItemRepository.findByUserIdAndStatusAndDueStudyDayIsNull(userId, TodoItemStatus.OPEN));
+            todoItemRepository.findByUserIdAndStatusAndStartDayIsNull(userId, TodoItemStatus.OPEN));
         List<TodoItem> outdated = sortItems(
-            todoItemRepository.findByUserIdAndStatusAndDueStudyDayBefore(userId, TodoItemStatus.OPEN, studyDay));
+            todoItemRepository.findByUserIdAndStatusAndStartDayBefore(userId, TodoItemStatus.OPEN, studyDay));
         List<TodoItem> done = sortItems(loadDoneForDay(userId, studyDay));
 
         return new TodoDayView(
@@ -93,9 +93,9 @@ public class TodoService {
     public List<TodoItemResponse> listPickerForToday(Long userId) {
         LocalDate today = studyDayService.currentStudyDay();
         List<TodoItem> items = new ArrayList<>();
-        items.addAll(todoItemRepository.findByUserIdAndStatusAndDueStudyDay(userId, TodoItemStatus.OPEN, today));
-        items.addAll(todoItemRepository.findByUserIdAndStatusAndDueStudyDayIsNull(userId, TodoItemStatus.OPEN));
-        items.addAll(todoItemRepository.findByUserIdAndStatusAndDueStudyDayBefore(userId, TodoItemStatus.OPEN, today));
+        items.addAll(todoItemRepository.findByUserIdAndStatusAndStartDay(userId, TodoItemStatus.OPEN, today));
+        items.addAll(todoItemRepository.findByUserIdAndStatusAndStartDayIsNull(userId, TodoItemStatus.OPEN));
+        items.addAll(todoItemRepository.findByUserIdAndStatusAndStartDayBefore(userId, TodoItemStatus.OPEN, today));
         return sortItems(items).stream().map(TodoItemResponse::from).toList();
     }
 
@@ -106,8 +106,8 @@ public class TodoService {
         String rawStatus,
         Long categoryId,
         Long tagId,
-        LocalDate dueFrom,
-        LocalDate dueTo,
+        LocalDate startFrom,
+        LocalDate startTo,
         Integer limit,
         Long cursor
     ) {
@@ -124,8 +124,8 @@ public class TodoService {
             status,
             categoryId,
             tagId,
-            dueFrom,
-            dueTo
+            startFrom,
+            startTo
         );
         matched.sort(SEARCH_SORT);
 
@@ -162,7 +162,7 @@ public class TodoService {
         validateOptionalCategory(userId, categoryId);
         validateOptionalTag(userId, tagId);
 
-        List<TodoItem> openInRange = todoItemRepository.findByUserIdAndStatusAndDueStudyDayBetween(
+        List<TodoItem> openInRange = todoItemRepository.findByUserIdAndStatusAndStartDayBetween(
             userId,
             TodoItemStatus.OPEN,
             from,
@@ -171,7 +171,7 @@ public class TodoService {
             .filter(item -> matchesBoardFilter(item, categoryId, tagId))
             .toList();
         Map<LocalDate, List<TodoItem>> openByDay = openInRange.stream()
-            .collect(Collectors.groupingBy(TodoItem::getDueStudyDay));
+            .collect(Collectors.groupingBy(TodoItem::getStartDay));
 
         int summaryOpenCount = (int) todoItemRepository.findByUserIdAndStatus(userId, TodoItemStatus.OPEN).stream()
             .filter(item -> matchesBoardFilter(item, categoryId, tagId))
@@ -249,21 +249,21 @@ public class TodoService {
         Long categoryId,
         List<Long> tagIds,
         Integer priority,
-        LocalDate dueStudyDay,
+        LocalDate startDay,
         LocalTime startTime,
         LocalTime endTime,
-        LocalDate endStudyDay
+        LocalDate endDay
     ) {
         String title = validateTitle(rawTitle);
         validatePriority(priority);
-        LocalDate effectiveEndDay = resolveEndStudyDay(dueStudyDay, endStudyDay, endTime);
-        validateSchedule(dueStudyDay, startTime, effectiveEndDay, endTime);
-        TodoItem item = new TodoItem(userId, title, dueStudyDay);
+        LocalDate effectiveEndDay = resolveEndDay(startDay, endDay, endTime);
+        validateSchedule(startDay, startTime, effectiveEndDay, endTime);
+        TodoItem item = new TodoItem(userId, title, startDay);
         item.setDescription(validateDescription(rawDescription));
         item.setPriority(priority);
         item.setStartTime(startTime);
         item.setEndTime(endTime);
-        item.setEndStudyDay(effectiveEndDay);
+        item.setEndDay(effectiveEndDay);
         applyCategory(userId, item, categoryId);
         applyTags(userId, item, tagIds);
         return todoItemRepository.save(item);
@@ -278,15 +278,15 @@ public class TodoService {
         Long categoryId,
         List<Long> tagIds,
         Integer priority,
-        LocalDate dueStudyDay,
+        LocalDate startDay,
         boolean clearCategory,
-        boolean clearDue,
+        boolean clearStartDay,
         LocalTime startTime,
         LocalTime endTime,
-        LocalDate endStudyDay,
+        LocalDate endDay,
         boolean clearStartTime,
         boolean clearEndTime,
-        boolean clearEndStudyDay,
+        boolean clearEndDay,
         boolean clearDescription
     ) {
         TodoItem item = getOwned(userId, todoId);
@@ -303,19 +303,19 @@ public class TodoService {
         } else if (categoryId != null) {
             applyCategory(userId, item, categoryId);
         }
-        if (clearDue) {
-            item.setDueStudyDay(null);
-        } else if (dueStudyDay != null) {
-            item.setDueStudyDay(dueStudyDay);
+        if (clearStartDay) {
+            item.setStartDay(null);
+        } else if (startDay != null) {
+            item.setStartDay(startDay);
         }
         applySchedule(
             item,
             startTime,
             endTime,
-            endStudyDay,
+            endDay,
             clearStartTime,
             clearEndTime,
-            clearEndStudyDay
+            clearEndDay
         );
         if (tagIds != null) {
             applyTags(userId, item, tagIds);
@@ -362,12 +362,12 @@ public class TodoService {
     @Transactional
     public TodoItem duplicate(Long userId, Long todoId) {
         TodoItem source = getOwned(userId, todoId);
-        TodoItem copy = new TodoItem(userId, copyTitle(source.getTitle()), source.getDueStudyDay());
+        TodoItem copy = new TodoItem(userId, copyTitle(source.getTitle()), source.getStartDay());
         copy.setDescription(source.getDescription());
         copy.setPriority(source.getPriority());
         copy.setStartTime(source.getStartTime());
         copy.setEndTime(source.getEndTime());
-        copy.setEndStudyDay(source.getEndStudyDay());
+        copy.setEndDay(source.getEndDay());
         copy.assignCategory(source.getCategory());
         if (!source.getTags().isEmpty()) {
             copy.replaceTags(new HashSet<>(source.getTags()));
@@ -491,7 +491,7 @@ public class TodoService {
         return items.stream()
             .sorted(Comparator
                 .comparing(TodoItem::getPriority, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(TodoItem::getDueStudyDay, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TodoItem::getStartDay, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TodoItem::getStartTime, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(TodoItem::getCreatedAt))
             .toList();
@@ -579,14 +579,14 @@ public class TodoService {
         TodoItem item,
         LocalTime startTime,
         LocalTime endTime,
-        LocalDate endStudyDay,
+        LocalDate endDay,
         boolean clearStartTime,
         boolean clearEndTime,
-        boolean clearEndStudyDay
+        boolean clearEndDay
     ) {
         LocalTime newStart = item.getStartTime();
         LocalTime newEnd = item.getEndTime();
-        LocalDate newEndDay = item.getEndStudyDay();
+        LocalDate newEndDay = item.getEndDay();
         if (clearStartTime) {
             newStart = null;
         } else if (startTime != null) {
@@ -594,48 +594,48 @@ public class TodoService {
         }
         if (clearEndTime) {
             newEnd = null;
-            if (endStudyDay == null) {
+            if (endDay == null) {
                 newEndDay = null;
             }
         } else if (endTime != null) {
             newEnd = endTime;
         }
-        if (clearEndStudyDay) {
+        if (clearEndDay) {
             newEndDay = null;
-        } else if (endStudyDay != null) {
-            newEndDay = endStudyDay;
+        } else if (endDay != null) {
+            newEndDay = endDay;
         }
-        newEndDay = resolveEndStudyDay(item.getDueStudyDay(), newEndDay, newEnd);
-        validateSchedule(item.getDueStudyDay(), newStart, newEndDay, newEnd);
+        newEndDay = resolveEndDay(item.getStartDay(), newEndDay, newEnd);
+        validateSchedule(item.getStartDay(), newStart, newEndDay, newEnd);
         item.setStartTime(newStart);
         item.setEndTime(newEnd);
-        item.setEndStudyDay(newEndDay);
+        item.setEndDay(newEndDay);
     }
 
-    private LocalDate resolveEndStudyDay(LocalDate dueStudyDay, LocalDate endStudyDay, LocalTime endTime) {
-        if (endStudyDay != null) {
-            return endStudyDay;
+    private LocalDate resolveEndDay(LocalDate startDay, LocalDate endDay, LocalTime endTime) {
+        if (endDay != null) {
+            return endDay;
         }
         if (endTime != null) {
-            return dueStudyDay;
+            return startDay;
         }
         return null;
     }
 
     private void validateSchedule(
-        LocalDate dueStudyDay,
+        LocalDate startDay,
         LocalTime startTime,
-        LocalDate endStudyDay,
+        LocalDate endDay,
         LocalTime endTime
     ) {
-        if (startTime == null && endTime == null && endStudyDay == null) {
+        if (startTime == null && endTime == null && endDay == null) {
             return;
         }
-        if (dueStudyDay == null) {
+        if (startDay == null) {
             throw new BadRequestException("START_DATE_REQUIRED", "종료·시간을 설정하려면 시작 날짜를 먼저 지정해주세요.");
         }
-        LocalDate effectiveEndDay = endStudyDay != null ? endStudyDay : dueStudyDay;
-        LocalDateTime start = LocalDateTime.of(dueStudyDay, startTime != null ? startTime : LocalTime.MIN);
+        LocalDate effectiveEndDay = endDay != null ? endDay : startDay;
+        LocalDateTime start = LocalDateTime.of(startDay, startTime != null ? startTime : LocalTime.MIN);
         LocalDateTime end = LocalDateTime.of(effectiveEndDay, endTime != null ? endTime : LocalTime.MAX);
         if (!end.isAfter(start)) {
             throw new BadRequestException("INVALID_TIME_RANGE", "종료 시각은 시작 시각 이후여야 합니다.");

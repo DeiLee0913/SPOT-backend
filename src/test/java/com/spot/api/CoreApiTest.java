@@ -254,7 +254,7 @@ class CoreApiTest {
         String user = newUserToken("수동");
 
         MvcResult todo = mockMvc.perform(asUser(post("/todos"), user)
-                .content("{\"title\":\"Existing task\",\"dueStudyDay\":\"2026-06-26\"}"))
+                .content("{\"title\":\"Existing task\",\"startDay\":\"2026-06-26\"}"))
             .andExpect(status().isCreated())
             .andReturn();
         long todoId = dataNode(todo).get("todoId").asLong();
