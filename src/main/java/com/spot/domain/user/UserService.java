@@ -2,6 +2,7 @@ package com.spot.domain.user;
 
 import com.spot.common.BadRequestException;
 import com.spot.common.NotFoundException;
+import com.spot.common.StudyDayService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -43,6 +44,14 @@ public class UserService {
     public User updateDefaultGoal(Long userId, int defaultGoalMinutes) {
         User user = getById(userId);
         user.changeDefaultGoalMinutes(defaultGoalMinutes);
+        return user;
+    }
+
+    @Transactional
+    public User updateStudyDayResetHour(Long userId, int studyDayResetHour) {
+        int hour = StudyDayService.normalizeResetHour(studyDayResetHour);
+        User user = getById(userId);
+        user.changeStudyDayResetHour(hour);
         return user;
     }
 

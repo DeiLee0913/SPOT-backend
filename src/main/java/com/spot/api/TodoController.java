@@ -22,6 +22,7 @@ import com.spot.domain.todo.TodoItem;
 import com.spot.domain.todo.TodoService;
 import com.spot.domain.todo.TodoService.TodoDayView;
 import com.spot.domain.todo.TodoTag;
+import com.spot.domain.user.UserService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -44,10 +45,16 @@ public class TodoController {
 
     private final TodoService todoService;
     private final StudyDayService studyDayService;
+    private final UserService userService;
 
-    public TodoController(TodoService todoService, StudyDayService studyDayService) {
+    public TodoController(
+        TodoService todoService,
+        StudyDayService studyDayService,
+        UserService userService
+    ) {
         this.todoService = todoService;
         this.studyDayService = studyDayService;
+        this.userService = userService;
     }
 
     @GetMapping
@@ -55,7 +62,9 @@ public class TodoController {
         @CurrentUser AuthenticatedUser currentUser,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate studyDay
     ) {
-        LocalDate day = studyDay != null ? studyDay : studyDayService.currentStudyDay();
+        LocalDate day = studyDay != null
+            ? studyDay
+            : studyDayService.currentStudyDay(userService.getById(currentUser.userId()).getStudyDayResetHour());
         TodoDayView view = todoService.listForStudyDay(currentUser.userId(), day);
         return ApiResponse.ok(toDayResponse(view));
     }

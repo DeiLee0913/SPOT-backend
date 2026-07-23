@@ -14,6 +14,8 @@ import com.spot.common.StudyDayService;
 import com.spot.domain.session.SessionStatus;
 import com.spot.domain.session.StudySession;
 import com.spot.domain.session.StudySessionRepository;
+import com.spot.domain.user.User;
+import com.spot.domain.user.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -55,19 +57,22 @@ public class TodoService {
     private final TodoTagRepository tagRepository;
     private final StudySessionRepository sessionRepository;
     private final StudyDayService studyDayService;
+    private final UserRepository userRepository;
 
     public TodoService(
         TodoItemRepository todoItemRepository,
         TodoCategoryRepository categoryRepository,
         TodoTagRepository tagRepository,
         StudySessionRepository sessionRepository,
-        StudyDayService studyDayService
+        StudyDayService studyDayService,
+        UserRepository userRepository
     ) {
         this.todoItemRepository = todoItemRepository;
         this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
         this.sessionRepository = sessionRepository;
         this.studyDayService = studyDayService;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -117,7 +122,7 @@ public class TodoService {
             return matched.subList(0, limit).stream().map(TodoItemResponse::from).toList();
         }
 
-        LocalDate today = studyDayService.currentStudyDay();
+        LocalDate today = studyDayService.currentStudyDay(resetHour(userId));
         List<TodoItem> items = new ArrayList<>();
         items.addAll(todoItemRepository.findByUserIdAndStatusAndStartDay(userId, TodoItemStatus.OPEN, today));
         items.addAll(todoItemRepository.findByUserIdAndStatusAndStartDayIsNull(userId, TodoItemStatus.OPEN));
@@ -263,7 +268,7 @@ public class TodoService {
         return todoItemRepository.save(new TodoItem(
             userId,
             title,
-            studyDayService.currentStudyDay()
+            studyDayService.currentStudyDay(resetHour(userId))
         ));
     }
 
@@ -374,7 +379,7 @@ public class TodoService {
     @Transactional
     public TodoItem rescheduleToday(Long userId, Long todoId) {
         TodoItem item = getOwned(userId, todoId);
-        item.rescheduleTo(studyDayService.currentStudyDay());
+        item.rescheduleTo(studyDayService.currentStudyDay(resetHour(userId)));
         return item;
     }
 
@@ -508,9 +513,16 @@ public class TodoService {
     }
 
     private List<TodoItem> loadDoneForDay(Long userId, LocalDate studyDay) {
-        Instant dayStart = studyDay.atTime(StudyDayService.RESET_HOUR, 0).atZone(StudyDayService.KST).toInstant();
-        Instant dayEnd = studyDay.plusDays(1).atTime(StudyDayService.RESET_HOUR, 0).atZone(StudyDayService.KST).toInstant();
+        int hour = resetHour(userId);
+        Instant dayStart = studyDayService.studyDayStart(studyDay, hour);
+        Instant dayEnd = studyDayService.studyDayEndExclusive(studyDay, hour);
         return todoItemRepository.findDoneForStudyDay(userId, studyDay, dayStart, dayEnd);
+    }
+
+    private int resetHour(Long userId) {
+        return userRepository.findById(userId)
+            .map(User::getStudyDayResetHour)
+            .orElse(StudyDayService.RESET_HOUR);
     }
 
     private List<TodoItem> sortItems(List<TodoItem> items) {
