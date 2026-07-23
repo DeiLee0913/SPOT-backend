@@ -72,7 +72,9 @@ public class DashboardService {
     public DashboardResponse getDashboard(Long userId, Long groupId, LocalDate requestedStudyDay) {
         groupService.requireActiveMembership(userId, groupId);
 
-        LocalDate today = studyDayService.currentStudyDay();
+        LocalDate today = studyDayService.currentStudyDay(
+            userRepository.findById(userId).map(User::getStudyDayResetHour).orElse(StudyDayService.RESET_HOUR)
+        );
         LocalDate rawViewEnd = requestedStudyDay != null ? requestedStudyDay : today;
         final LocalDate viewEnd = rawViewEnd.isAfter(today) ? today : rawViewEnd;
         LocalDate viewStart = studyDayService.weekMonday(viewEnd);
@@ -107,7 +109,7 @@ public class DashboardService {
         LocalDate viewEnd,
         boolean afterDeadlineToday
     ) {
-        LocalDate joinedStudyDay = resolveJoinedStudyDay(membership, today);
+        LocalDate joinedStudyDay = resolveJoinedStudyDay(membership, user, today);
         int defaultGoal = user.getDefaultGoalMinutes();
 
         Map<LocalDate, Integer> minutesByDay = new HashMap<>();
@@ -192,12 +194,13 @@ public class DashboardService {
         return acc;
     }
 
-    private LocalDate resolveJoinedStudyDay(GroupMember membership, LocalDate today) {
+    private LocalDate resolveJoinedStudyDay(GroupMember membership, User user, LocalDate today) {
+        int resetHour = user.getStudyDayResetHour();
         if (membership.getJoinedAt() != null) {
-            return studyDayService.toStudyDay(membership.getJoinedAt());
+            return studyDayService.toStudyDay(membership.getJoinedAt(), resetHour);
         }
         if (membership.getCreatedAt() != null) {
-            return studyDayService.toStudyDay(membership.getCreatedAt());
+            return studyDayService.toStudyDay(membership.getCreatedAt(), resetHour);
         }
         return today;
     }

@@ -51,8 +51,8 @@ public class GoalService {
     @Transactional(readOnly = true)
     public boolean needsTodayGoalSetup(Long userId) {
         User user = getUser(userId);
-        LocalDate today = studyDayService.currentStudyDay();
-        LocalDate joinStudyDay = studyDayService.toStudyDay(user.getCreatedAt());
+        LocalDate today = studyDayService.currentStudyDay(user.getStudyDayResetHour());
+        LocalDate joinStudyDay = studyDayService.toStudyDay(user.getCreatedAt(), user.getStudyDayResetHour());
         if (!today.equals(joinStudyDay)) {
             return false;
         }
@@ -62,7 +62,8 @@ public class GoalService {
 
     @Transactional(readOnly = true)
     public TodayGoalView getToday(Long userId) {
-        LocalDate today = studyDayService.currentStudyDay();
+        User user = getUser(userId);
+        LocalDate today = studyDayService.currentStudyDay(user.getStudyDayResetHour());
         if (needsTodayGoalSetup(userId)) {
             return new TodayGoalView(today, null, null, studyDayService.isAfterGoalDeadline(today));
         }
@@ -80,15 +81,15 @@ public class GoalService {
 
         boolean afterDeadline = studyDayService.isAfterGoalDeadline(today);
         if (afterDeadline) {
-            int defaultGoal = getUser(userId).getDefaultGoalMinutes();
-            return new TodayGoalView(today, defaultGoal, GoalSource.DEFAULT_APPLIED, true);
+            return new TodayGoalView(today, user.getDefaultGoalMinutes(), GoalSource.DEFAULT_APPLIED, true);
         }
         return new TodayGoalView(today, null, null, false);
     }
 
     @Transactional
     public DailyGoal setToday(Long userId, int goalMinutes) {
-        return setForStudyDay(userId, studyDayService.currentStudyDay(), goalMinutes);
+        User user = getUser(userId);
+        return setForStudyDay(userId, studyDayService.currentStudyDay(user.getStudyDayResetHour()), goalMinutes);
     }
 
     /**
@@ -99,7 +100,8 @@ public class GoalService {
         if (goalMinutes < 0) {
             throw new BadRequestException("INVALID_GOAL", "목표 시간은 0분 이상이어야 합니다.");
         }
-        LocalDate today = studyDayService.currentStudyDay();
+        User user = getUser(userId);
+        LocalDate today = studyDayService.currentStudyDay(user.getStudyDayResetHour());
         if (studyDay.isBefore(today)) {
             throw new BadRequestException("GOAL_PAST_LOCKED", "과거 날짜의 목표는 변경할 수 없습니다.");
         }
@@ -183,7 +185,8 @@ public class GoalService {
         if (row.isPresent()) {
             return row.get().getGoalMinutes();
         }
-        LocalDate today = studyDayService.currentStudyDay();
+        User user = getUser(userId);
+        LocalDate today = studyDayService.currentStudyDay(user.getStudyDayResetHour());
         if (day.isBefore(today)) {
             return defaultGoalMinutes;
         }
@@ -197,11 +200,35 @@ public class GoalService {
     }
 
     /**
-     * 11:00 마감 스케줄러: 해당 study day에 일일 목표가 없는 ACTIVE 사용자에게
-     * 본인 DEFAULT 목표를 스냅샷(DEFAULT_APPLIED)으로 확정한다. 재실행해도 안전(idempotent)하다.
+     * 11:00 마감 스케줄러: 각 사용자 현재 study day에 일일 목표가 없으면 DEFAULT 스냅샷.
+     * 계정별 reset hour를 반영하며 재실행해도 안전(idempotent)하다.
      *
      * @return 새로 생성된 일일 목표 수
      */
+    @Transactional
+    public int applyDefaultGoalsForAllUsers() {
+        List<User> activeUsers = userRepository.findByStatus(UserStatus.ACTIVE);
+        int created = 0;
+        for (User user : activeUsers) {
+            LocalDate studyDay = studyDayService.currentStudyDay(user.getStudyDayResetHour());
+            if (!studyDayService.isAfterGoalDeadline(studyDay)) {
+                continue;
+            }
+            if (dailyGoalRepository.findByUserIdAndStudyDay(user.getId(), studyDay).isPresent()) {
+                continue;
+            }
+            dailyGoalRepository.save(new DailyGoal(
+                user.getId(),
+                studyDay,
+                user.getDefaultGoalMinutes(),
+                GoalSource.DEFAULT_APPLIED
+            ));
+            created++;
+        }
+        return created;
+    }
+
+    /** @deprecated 테스트 호환 — {@link #applyDefaultGoalsForAllUsers()} 사용 */
     @Transactional
     public int applyDefaultGoals(LocalDate studyDay) {
         Set<Long> alreadySet = dailyGoalRepository.findByStudyDay(studyDay).stream()

@@ -7,17 +7,20 @@ import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
 import com.spot.domain.todo.TodoItem;
 import com.spot.domain.todo.TodoService;
+import com.spot.domain.user.User;
+import com.spot.domain.user.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import static com.spot.common.StudyDayService.KST;
-import static com.spot.common.StudyDayService.RESET_HOUR;
 
 @Service
 public class SessionService {
@@ -27,15 +30,18 @@ public class SessionService {
     private final StudySessionRepository sessionRepository;
     private final StudyDayService studyDayService;
     private final TodoService todoService;
+    private final UserRepository userRepository;
 
     public SessionService(
         StudySessionRepository sessionRepository,
         StudyDayService studyDayService,
-        TodoService todoService
+        TodoService todoService,
+        UserRepository userRepository
     ) {
         this.sessionRepository = sessionRepository;
         this.studyDayService = studyDayService;
         this.todoService = todoService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -45,8 +51,9 @@ public class SessionService {
         });
         Long linkedTodoId = resolveTodoForStart(userId, todoId, rawTitle);
         Instant now = studyDayService.now();
+        int resetHour = resetHour(userId);
         return sessionRepository.save(
-            StudySession.openTimer(userId, studyDayService.toStudyDay(now), linkedTodoId, now)
+            StudySession.openTimer(userId, studyDayService.toStudyDay(now, resetHour), linkedTodoId, now)
         );
     }
 
@@ -106,7 +113,7 @@ public class SessionService {
         validateRange(startedAt, endedAt);
         ensureNoOverlap(userId, startedAt, endedAt);
 
-        LocalDate studyDay = studyDayService.toStudyDay(startedAt);
+        LocalDate studyDay = studyDayService.toStudyDay(startedAt, resetHour(userId));
         Long linkedTodoId = resolveTodoForManual(userId, todoId, rawTitle, studyDay);
         return sessionRepository.save(StudySession.manual(userId, studyDay, linkedTodoId, startedAt, endedAt));
     }
@@ -119,29 +126,37 @@ public class SessionService {
 
     @Transactional
     public int closeCrossDaySessions() {
-        LocalDate currentStudyDay = studyDayService.currentStudyDay();
-        int closed = 0;
-        closed += closeStaleSessions(SessionStatus.OPEN, currentStudyDay);
-        closed += closeStaleSessions(SessionStatus.PAUSED, currentStudyDay);
-        return closed;
-    }
-
-    private int closeStaleSessions(SessionStatus status, LocalDate currentStudyDay) {
-        List<StudySession> stale = sessionRepository.findByStatusAndStudyDayBefore(status, currentStudyDay);
-        for (StudySession session : stale) {
-            Instant boundary = session.getStudyDay()
-                .plusDays(1)
-                .atTime(RESET_HOUR, 0)
-                .atZone(KST)
-                .toInstant();
-            session.close(boundary);
+        List<StudySession> active = sessionRepository.findByStatusIn(
+            List.of(SessionStatus.OPEN, SessionStatus.PAUSED)
+        );
+        if (active.isEmpty()) {
+            return 0;
         }
-        return stale.size();
+        Map<Long, User> users = userRepository.findAllById(
+            active.stream().map(StudySession::getUserId).distinct().toList()
+        ).stream().collect(Collectors.toMap(User::getId, Function.identity()));
+
+        int closed = 0;
+        for (StudySession session : active) {
+            User user = users.get(session.getUserId());
+            if (user == null) {
+                continue;
+            }
+            int resetHour = user.getStudyDayResetHour();
+            LocalDate userToday = studyDayService.currentStudyDay(resetHour);
+            if (!session.getStudyDay().isBefore(userToday)) {
+                continue;
+            }
+            Instant boundary = studyDayService.studyDayEndExclusive(session.getStudyDay(), resetHour);
+            session.close(boundary);
+            closed++;
+        }
+        return closed;
     }
 
     @Transactional(readOnly = true)
     public List<StudySession> today(Long userId) {
-        return listForStudyDay(userId, studyDayService.currentStudyDay());
+        return listForStudyDay(userId, studyDayService.currentStudyDay(resetHour(userId)));
     }
 
     @Transactional(readOnly = true)
@@ -191,6 +206,15 @@ public class SessionService {
         String title = validateTitle(rawTitle);
         TodoItem todo = todoService.create(userId, title, null, null, null, null, studyDay, null, null, null);
         return todo.getId();
+    }
+
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
+    }
+
+    private int resetHour(Long userId) {
+        return getUser(userId).getStudyDayResetHour();
     }
 
     private StudySession getOwnedSession(Long userId, Long sessionId) {

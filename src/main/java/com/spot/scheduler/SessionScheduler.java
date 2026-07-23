@@ -18,11 +18,14 @@ public class SessionScheduler {
     }
 
     /**
-     * 매일 06:00 KST — study day가 지난 OPEN 세션을 경계 시각으로 강제 종료한다.
+     * 매시 정각 KST — 계정별 study day가 지난 OPEN/PAUSED 세션을 경계 시각으로 강제 종료한다.
+     * (계정별 reset hour 대응; 기존 매일 06:00 단일 cron 대체)
      */
-    @Scheduled(cron = "0 0 6 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
     public void closeCrossDaySessions() {
         int closed = sessionService.closeCrossDaySessions();
-        log.info("[CloseCrossDaySessions] closed={}", closed);
+        if (closed > 0) {
+            log.info("[CloseCrossDaySessions] closed={}", closed);
+        }
     }
 }

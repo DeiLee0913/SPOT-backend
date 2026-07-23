@@ -103,4 +103,32 @@ class SchedulerTest {
         StudySession reloadedCurrent = sessionRepository.findById(current.getId()).orElseThrow();
         assertThat(reloadedCurrent.getStatus()).isEqualTo(SessionStatus.OPEN);
     }
+
+    @Test
+    void closeCrossDaySessionsUsesAccountResetHourBoundary() {
+        User owner = userRepository.save(User.ofSocial(AuthProvider.NAVER, "sched-reset0", null, "자정리셋", 60));
+        owner.changeStudyDayResetHour(0);
+        userRepository.save(owner);
+
+        Instant startedAt = Instant.parse("2026-06-26T01:00:00Z"); // 10:00 KST on 6/26
+        StudySession stale = sessionRepository.save(
+            StudySession.openTimer(owner.getId(), LocalDate.of(2026, 6, 26), null, startedAt));
+
+        int closed = sessionService.closeCrossDaySessions();
+        assertThat(closed).isGreaterThanOrEqualTo(1);
+
+        StudySession reloaded = sessionRepository.findById(stale.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(SessionStatus.CLOSED);
+        // reset=0 → 경계 2026-06-27 00:00 KST = 2026-06-26T15:00:00Z
+        assertThat(reloaded.getEndedAt()).isEqualTo(Instant.parse("2026-06-26T15:00:00Z"));
+    }
+
+    @Test
+    void applyDefaultGoalsForAllUsersSkipsBeforeDeadline() {
+        User user = userRepository.save(User.ofSocial(AuthProvider.NAVER, "sched-before-deadline", null, "마감전", 60));
+
+        int created = goalService.applyDefaultGoalsForAllUsers();
+        assertThat(created).isZero();
+        assertThat(dailyGoalRepository.findByUserIdAndStudyDay(user.getId(), TODAY)).isEmpty();
+    }
 }

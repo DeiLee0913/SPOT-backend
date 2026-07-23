@@ -4,6 +4,7 @@ import com.spot.auth.AuthenticatedUser;
 import com.spot.auth.CurrentUser;
 import com.spot.common.ApiResponse;
 import com.spot.common.BadRequestException;
+import com.spot.common.StudyDayService;
 import com.spot.domain.group.GroupService;
 import com.spot.domain.group.GroupService.MyGroup;
 import com.spot.domain.group.MemberStatus;
@@ -13,10 +14,12 @@ import com.spot.domain.session.StudySession;
 import com.spot.domain.user.User;
 import com.spot.domain.user.UserService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -30,17 +33,20 @@ public class MeController {
     private final GroupService groupService;
     private final SessionService sessionService;
     private final GoalService goalService;
+    private final StudyDayService studyDayService;
 
     public MeController(
         UserService userService,
         GroupService groupService,
         SessionService sessionService,
-        GoalService goalService
+        GoalService goalService,
+        StudyDayService studyDayService
     ) {
         this.userService = userService;
         this.groupService = groupService;
         this.sessionService = sessionService;
         this.goalService = goalService;
+        this.studyDayService = studyDayService;
     }
 
     @GetMapping("/me")
@@ -69,8 +75,19 @@ public class MeController {
         return me(currentUser);
     }
 
+    @PutMapping("/me/study-day-reset-hour")
+    public ApiResponse<MeResponse> updateStudyDayResetHour(
+        @CurrentUser AuthenticatedUser currentUser,
+        @Valid @RequestBody UpdateStudyDayResetHourRequest request
+    ) {
+        userService.updateStudyDayResetHour(currentUser.userId(), request.studyDayResetHour());
+        return me(currentUser);
+    }
+
     private MeResponse buildMeResponse(Long userId) {
         User user = userService.getById(userId);
+        int resetHour = user.getStudyDayResetHour();
+        LocalDate currentStudyDay = studyDayService.currentStudyDay(resetHour);
 
         List<GroupSummary> groups = groupService.listMyGroups(userId).stream()
             .map(MeController::toGroupSummary)
@@ -94,6 +111,8 @@ public class MeController {
             user.needsDisplayNameSetup(),
             goalService.needsTodayGoalSetup(userId),
             user.getDefaultGoalMinutes(),
+            resetHour,
+            currentStudyDay,
             groups,
             group,
             openSession
@@ -133,6 +152,14 @@ public class MeController {
     ) {
     }
 
+    public record UpdateStudyDayResetHourRequest(
+        @NotNull(message = "일자 전환 시각을 입력해주세요.")
+        @Min(value = 0, message = "일자 전환 시각은 0~23시여야 합니다.")
+        @Max(value = 23, message = "일자 전환 시각은 0~23시여야 합니다.")
+        Integer studyDayResetHour
+    ) {
+    }
+
     public record MeResponse(
         Long userId,
         String nickname,
@@ -141,6 +168,8 @@ public class MeController {
         boolean needsDisplayNameSetup,
         boolean needsTodayGoalSetup,
         int defaultGoalMinutes,
+        int studyDayResetHour,
+        LocalDate currentStudyDay,
         List<GroupSummary> groups,
         GroupSummary group,
         OpenSession openSession

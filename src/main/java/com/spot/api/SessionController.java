@@ -11,6 +11,7 @@ import com.spot.common.NotFoundException;
 import com.spot.common.StudyDayService;
 import com.spot.domain.session.SessionService;
 import com.spot.domain.session.StudySession;
+import com.spot.domain.user.UserService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -32,10 +33,16 @@ public class SessionController {
 
     private final SessionService sessionService;
     private final StudyDayService studyDayService;
+    private final UserService userService;
 
-    public SessionController(SessionService sessionService, StudyDayService studyDayService) {
+    public SessionController(
+        SessionService sessionService,
+        StudyDayService studyDayService,
+        UserService userService
+    ) {
         this.sessionService = sessionService;
         this.studyDayService = studyDayService;
+        this.userService = userService;
     }
 
     @PostMapping("/start")
@@ -118,7 +125,9 @@ public class SessionController {
         @CurrentUser AuthenticatedUser currentUser,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate studyDay
     ) {
-        LocalDate day = studyDay != null ? studyDay : studyDayService.currentStudyDay();
+        LocalDate day = studyDay != null
+            ? studyDay
+            : studyDayService.currentStudyDay(userService.getById(currentUser.userId()).getStudyDayResetHour());
         List<SessionResponse> sessions = sessionService.listForStudyDay(currentUser.userId(), day).stream()
             .map(this::toResponse)
             .toList();

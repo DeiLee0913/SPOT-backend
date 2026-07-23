@@ -26,6 +26,7 @@ public class User {
 
     public static final int MIN_DISPLAY_NAME_LENGTH = 1;
     public static final int MAX_DISPLAY_NAME_LENGTH = 20;
+    public static final int DEFAULT_STUDY_DAY_RESET_HOUR = 6;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,6 +50,10 @@ public class User {
 
     @Column(name = "default_goal_minutes", nullable = false)
     private int defaultGoalMinutes;
+
+    /** KST 일자 전환 시각 (0–23). 기본 6 (= 06:00). */
+    @Column(name = "study_day_reset_hour", nullable = false)
+    private int studyDayResetHour = DEFAULT_STUDY_DAY_RESET_HOUR;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -78,6 +83,7 @@ public class User {
         this.email = email;
         this.naverNickname = normalizeOptional(naverNickname);
         this.defaultGoalMinutes = defaultGoalMinutes;
+        this.studyDayResetHour = DEFAULT_STUDY_DAY_RESET_HOUR;
         this.status = UserStatus.ACTIVE;
     }
 
@@ -105,6 +111,10 @@ public class User {
 
     public void changeDefaultGoalMinutes(int defaultGoalMinutes) {
         this.defaultGoalMinutes = defaultGoalMinutes;
+    }
+
+    public void changeStudyDayResetHour(int studyDayResetHour) {
+        this.studyDayResetHour = studyDayResetHour;
     }
 
     public void updateNaverNickname(String naverNickname) {
@@ -180,6 +190,10 @@ public class User {
 
     public int getDefaultGoalMinutes() {
         return defaultGoalMinutes;
+    }
+
+    public int getStudyDayResetHour() {
+        return studyDayResetHour;
     }
 
     public UserStatus getStatus() {

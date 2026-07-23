@@ -17,6 +17,8 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
 
     List<StudySession> findByStatusAndStudyDayBefore(SessionStatus status, LocalDate studyDay);
 
+    List<StudySession> findByStatusIn(Collection<SessionStatus> statuses);
+
     List<StudySession> findByUserId(Long userId);
 
     List<StudySession> findByUserIdAndStudyDay(Long userId, LocalDate studyDay);
