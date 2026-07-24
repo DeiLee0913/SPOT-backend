@@ -632,9 +632,6 @@ public class TodoService {
         }
         if (clearEndTime) {
             newEnd = null;
-            if (endDay == null) {
-                newEndDay = null;
-            }
         } else if (endTime != null) {
             newEnd = endTime;
         }

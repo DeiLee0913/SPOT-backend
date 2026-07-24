@@ -454,6 +454,58 @@ class TodoApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
             .andExpect(jsonPath("$.data.endTime").value(nullValue()))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-27")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "endDay": "2026-06-28",
+                      "endTime": "11:00"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.endTime", is("11:00:00")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "clearEndTime": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-28")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "endTime": "12:00",
+                      "clearEndDay": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endTime", is("12:00:00")))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-27")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "endDay": "2026-06-29",
+                      "endTime": "13:00"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "clearEndTime": true,
+                      "clearEndDay": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()))
             .andExpect(jsonPath("$.data.endDay").value(nullValue()));
 
         mockMvc.perform(asUser(patch("/todos/" + todoId), token)
