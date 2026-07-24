@@ -454,6 +454,58 @@ class TodoApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.startTime", is("10:00:00")))
             .andExpect(jsonPath("$.data.endTime").value(nullValue()))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-27")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "endDay": "2026-06-28",
+                      "endTime": "11:00"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-28")))
+            .andExpect(jsonPath("$.data.endTime", is("11:00:00")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "clearEndTime": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-28")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "endTime": "12:00",
+                      "clearEndDay": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endTime", is("12:00:00")))
+            .andExpect(jsonPath("$.data.endDay", is("2026-06-27")));
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "endDay": "2026-06-29",
+                      "endTime": "13:00"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch("/todos/" + todoId), token)
+                .content("""
+                    {
+                      "clearEndTime": true,
+                      "clearEndDay": true
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endTime").value(nullValue()))
             .andExpect(jsonPath("$.data.endDay").value(nullValue()));
 
         mockMvc.perform(asUser(patch("/todos/" + todoId), token)
@@ -720,6 +772,138 @@ class TodoApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.summary.completedCount", is(1)))
             .andExpect(jsonPath("$.data.summary.studyMinutes", is(60)));
+    }
+
+    @Test
+    void boardOpenCountExcludesFutureAndPutsUndatedOnToday() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "In range open",
+                      "startDay": "2026-06-27"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Undated open"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.startDay").value(nullValue()));
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Future open",
+                      "startDay": "2026-07-05"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-23")
+                .param("to", "2026-06-27"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.openCount", is(2)))
+            .andExpect(jsonPath("$.data.days[0].studyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.days[0].openCount", is(2)));
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-16")
+                .param("to", "2026-06-20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.openCount", is(1)))
+            .andExpect(jsonPath("$.data.days.length()", is(0)));
+    }
+
+    @Test
+    void boardSummaryIncludesOutdatedOpenButNotFuture() throws Exception {
+        String token = newUserToken();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Outdated open",
+                      "startDay": "2026-06-20"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Boundary to open",
+                      "startDay": "2026-06-27"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Just after to",
+                      "startDay": "2026-06-28"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-23")
+                .param("to", "2026-06-27"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.openCount", is(2)))
+            .andExpect(jsonPath("$.data.days[0].studyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.days[0].openCount", is(1)));
+    }
+
+    @Test
+    void boardUndatedOpenRespectsCategoryFilter() throws Exception {
+        String token = newUserToken();
+
+        MvcResult category = mockMvc.perform(asUser(post("/todos/categories"), token)
+                .content("{\"name\":\"Algo\",\"color\":\"#111111\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long categoryId = dataNode(category).get("categoryId").asLong();
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Undated with category",
+                      "categoryId": %d
+                    }
+                    """.formatted(categoryId)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.startDay").value(nullValue()));
+
+        mockMvc.perform(asUser(post("/todos"), token)
+                .content("""
+                    {
+                      "title": "Undated without category"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-23")
+                .param("to", "2026-06-27")
+                .param("categoryId", String.valueOf(categoryId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.openCount", is(1)))
+            .andExpect(jsonPath("$.data.days[0].studyDay", is("2026-06-27")))
+            .andExpect(jsonPath("$.data.days[0].openCount", is(1)));
+
+        mockMvc.perform(asUser(get("/todos/board"), token)
+                .param("from", "2026-06-23")
+                .param("to", "2026-06-27"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.openCount", is(2)))
+            .andExpect(jsonPath("$.data.days[0].openCount", is(2)));
     }
 
     @Test

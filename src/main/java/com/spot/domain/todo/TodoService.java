@@ -204,8 +204,18 @@ public class TodoService {
         Map<LocalDate, List<TodoItem>> openByDay = openInRange.stream()
             .collect(Collectors.groupingBy(TodoItem::getStartDay));
 
+        LocalDate today = studyDayService.currentStudyDay(resetHour(userId));
+        List<TodoItem> undatedOpen = List.of();
+        if (!today.isBefore(from) && !today.isAfter(to)) {
+            undatedOpen = todoItemRepository.findByUserIdAndStatusAndStartDayIsNull(userId, TodoItemStatus.OPEN)
+                .stream()
+                .filter(item -> matchesBoardFilter(item, categoryId, tagId))
+                .toList();
+        }
+
         int summaryOpenCount = (int) todoItemRepository.findByUserIdAndStatus(userId, TodoItemStatus.OPEN).stream()
             .filter(item -> matchesBoardFilter(item, categoryId, tagId))
+            .filter(item -> item.getStartDay() == null || !item.getStartDay().isAfter(to))
             .count();
 
         List<StudySession> sessions = sessionRepository.findByUserIdAndStatusAndStudyDayBetween(
@@ -232,6 +242,11 @@ public class TodoService {
 
             for (TodoItem item : openByDay.getOrDefault(day, List.of())) {
                 accumulator.addOpen(item);
+            }
+            if (day.equals(today)) {
+                for (TodoItem item : undatedOpen) {
+                    accumulator.addOpen(item);
+                }
             }
 
             for (StudySession session : sessions) {
@@ -632,9 +647,6 @@ public class TodoService {
         }
         if (clearEndTime) {
             newEnd = null;
-            if (endDay == null) {
-                newEndDay = null;
-            }
         } else if (endTime != null) {
             newEnd = endTime;
         }
